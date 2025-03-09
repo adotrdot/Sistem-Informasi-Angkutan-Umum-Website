@@ -1,0 +1,92 @@
+/* public/css/style.css */
+
+/* General Body Styling */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f8f9fa;
+    margin: 0;
+    padding: 0;
+  }
+  
+  /* ----------------- */
+  /* LOGIN PAGE STYLING */
+  /* ----------------- */
+  .login-page {
+    background: url('/images/bus-station.jpg') no-repeat center center fixed;
+    background-size: cover;
+    height: 100vh;
+  }
+  
+  .login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+  }
+  
+  .login-card {
+    width: 100%;
+    max-width: 400px;
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: 20px;
+    border-radius: 8px;
+  }
+  
+  /* ----------------- */
+  /* SIDEBAR LAYOUT   */
+  /* ----------------- */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 240px;
+    height: 100vh;
+    background-color: #fff;
+    border-right: 1px solid #dee2e6;
+    padding: 1rem;
+  }
+  
+  .sidebar-brand {
+    text-align: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #dee2e6;
+  }
+  
+  .sidebar .nav-link {
+    color: #333;
+    font-weight: 500;
+    text-decoration: none;
+    display: block;
+    padding: 0.5rem 1rem;
+    border-radius: 5px; /* Always apply border radius */
+    transition: background-color 0.2s;
+  }
+  
+  /* Hover state for unselected sidebar links (except logout) */
+  .sidebar .nav-link:not(.active):not(.text-danger):hover {
+    background-color: #e9ecef; /* grey background */
+    color: #333;
+  }
+  
+  /* Active (selected) button styling */
+  .sidebar .nav-link.active {
+    background-color: #007bff;
+    color: #fff;
+  }
+  
+  /* Logout link: ensure its hover state has a red background with white text */
+  .sidebar .nav-link.text-danger:hover {
+    background-color: #dc3545;
+    color: #fff !important;
+  }
+  
+  /* ----------------- */
+  /* MAIN CONTENT     */
+  /* ----------------- */
+  .content {
+    margin-left: 240px; /* matches the sidebar width */
+    padding: 1rem;
+    min-height: 100vh;
+    background-color: #f8f9fa;
+  }
+  
