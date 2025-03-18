@@ -23,7 +23,7 @@ const pool = mysql.createPool({
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Serve static files
+// Middleware
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({
@@ -34,11 +34,11 @@ app.use(session({
 
 // Authentication middleware
 function isAuthenticated(req, res, next) {
-  if (req.session && req.session.user) {
-    return next();
-  }
+  if (req.session && req.session.user) return next();
   res.redirect('/login');
 }
+
+// --- Basic Routes --- //
 
 // Root route: redirect to home
 app.get('/', (req, res) => {
@@ -71,7 +71,7 @@ app.post('/login', (req, res) => {
 });
 
 // GET /home (requires login)
-// For non-admin users without a terminal, load provinsi list for the forced terminal update modal.
+// For non-admin users without a linked terminal, load provinsi list for the forced terminal update modal.
 app.get('/home', isAuthenticated, (req, res) => {
   if (req.session.user.role === 'user' && !req.session.user.terminal) {
     pool.query('SELECT * FROM provinsi ORDER BY name', (err, provinsiList) => {
@@ -88,18 +88,12 @@ app.get('/home', isAuthenticated, (req, res) => {
 
 // GET /admin (requires login, admin only)
 app.get('/admin', isAuthenticated, (req, res) => {
-  if (req.session.user.role !== 'admin') {
-    return res.status(403).send('Forbidden');
-  }
-  
-  // Query the list of provinces for the Create User form.
+  if (req.session.user.role !== 'admin') return res.status(403).send('Forbidden');
   pool.query('SELECT * FROM provinsi ORDER BY name', (err, provinsiList) => {
     if (err) {
       console.error(err);
       return res.send('Error retrieving provinsi');
     }
-    
-    // Query to join users with terminal, kabupaten, and provinsi.
     const query = `
       SELECT 
         u.id, 
@@ -113,7 +107,6 @@ app.get('/admin', isAuthenticated, (req, res) => {
       LEFT JOIN kabupaten k ON t.kabupaten_id = k.id
       LEFT JOIN provinsi p ON k.provinsi_id = p.id
     `;
-    
     pool.query(query, (err, users) => {
       if (err) {
         console.error(err);
@@ -128,9 +121,7 @@ app.get('/admin', isAuthenticated, (req, res) => {
 // New user creation: only username, password, and role are collected.
 // For role "user", the terminal field is set to NULL so the user can update it later.
 app.post('/admin/create-user', isAuthenticated, (req, res) => {
-  if (req.session.user.role !== 'admin') {
-    return res.status(403).send('Forbidden');
-  }
+  if (req.session.user.role !== 'admin') return res.status(403).send('Forbidden');
   const { username, password, role } = req.body;
   if (!username || !password || !role) {
     return res.render('admin', { users: [], error: 'Username, password, and role are required.', provinsiList: [] });
@@ -146,6 +137,12 @@ app.post('/admin/create-user', isAuthenticated, (req, res) => {
       res.redirect('/admin');
     }
   );
+});
+
+// GET /logout
+app.get('/logout', (req, res) => {
+  req.session.destroy();
+  res.redirect('/login');
 });
 
 // GET /get-kabupaten (accessible to any authenticated user)
@@ -198,27 +195,186 @@ app.post('/user/update-terminal', isAuthenticated, (req, res) => {
   );
 });
 
-// GET /logout
-app.get('/logout', (req, res) => {
-  req.session.destroy();
-  res.redirect('/login');
+// --- New Pages and API Endpoints --- //
+
+// GET /kedatangan (Data Kedatangan)
+app.get('/kedatangan', isAuthenticated, (req, res) => {
+  // For non-admin users without a linked terminal, redirect to /home.
+  if (req.session.user.role === 'user' && (!req.session.user.terminal || req.session.user.terminal === "")) {
+    return res.redirect('/home');
+  }
+  
+  if (req.session.user.role === 'user') {
+    // Get the user's terminal name
+    pool.query("SELECT nama_terminal FROM terminal WHERE id = ?", [req.session.user.terminal], (err, termResults) => {
+      if (err) {
+        console.error(err);
+        return res.send("Error retrieving terminal info");
+      }
+      let userTerminalName = (termResults.length > 0) ? termResults[0].nama_terminal : "";
+      // Retrieve arrival data for this terminal, formatting the date on the SQL side.
+      const query = `
+        SELECT 
+          DATE_FORMAT(tanggal, '%d-%m-%Y') AS tanggal, 
+          jam, 
+          nomor_polisi,
+          '' AS nama_PO,
+          '' AS asal,
+          '' AS tujuan
+        FROM arrival
+        WHERE terminal_id = ?
+      `;
+      pool.query(query, [req.session.user.terminal], (err, results) => {
+        if (err) {
+          console.error(err);
+          return res.send("Error retrieving arrival data");
+        }
+        res.render("kedatangan", { user: req.session.user, data: results, userTerminalName: userTerminalName });
+      });
+    });
+  } else {
+    // Admin sees all arrival data.
+    const query = `
+      SELECT 
+        DATE_FORMAT(tanggal, '%d-%m-%Y') AS tanggal, 
+        jam, 
+        nomor_polisi,
+        '' AS nama_PO,
+        '' AS asal,
+        '' AS tujuan
+      FROM arrival
+    `;
+    pool.query(query, (err, results) => {
+      if (err) {
+        console.error(err);
+        return res.send("Error retrieving arrival data");
+      }
+      res.render("kedatangan", { user: req.session.user, data: results, userTerminalName: "All" });
+    });
+  }
 });
 
-// --------------------------
-// WebSocket Server Setup
-// --------------------------
+// GET /keberangkatan (Data Keberangkatan)
+app.get('/keberangkatan', isAuthenticated, (req, res) => {
+  // For non-admin users without a linked terminal, redirect to /home.
+  if (req.session.user.role === 'user' && (!req.session.user.terminal || req.session.user.terminal === "")) {
+    return res.redirect('/home');
+  }
+  
+  if (req.session.user.role === 'user') {
+    // Get the user's terminal name.
+    pool.query("SELECT nama_terminal FROM terminal WHERE id = ?", [req.session.user.terminal], (err, termResults) => {
+      if (err) {
+        console.error(err);
+        return res.send("Error retrieving terminal info");
+      }
+      let userTerminalName = (termResults.length > 0) ? termResults[0].nama_terminal : "";
+      // Retrieve departure data for this terminal with formatted date.
+      const query = `
+        SELECT 
+          DATE_FORMAT(tanggal, '%d-%m-%Y') AS tanggal, 
+          jam, 
+          nomor_polisi,
+          '' AS nama_PO,
+          '' AS asal,
+          '' AS tujuan
+        FROM departure
+        WHERE terminal_id = ?
+      `;
+      pool.query(query, [req.session.user.terminal], (err, results) => {
+        if (err) {
+          console.error(err);
+          return res.send("Error retrieving departure data");
+        }
+        res.render("keberangkatan", { user: req.session.user, data: results, userTerminalName: userTerminalName });
+      });
+    });
+  } else {
+    // Admin sees all departure data.
+    const query = `
+      SELECT 
+        DATE_FORMAT(tanggal, '%d-%m-%Y') AS tanggal, 
+        jam, 
+        nomor_polisi,
+        '' AS nama_PO,
+        '' AS asal,
+        '' AS tujuan
+      FROM departure
+    `;
+    pool.query(query, (err, results) => {
+      if (err) {
+        console.error(err);
+        return res.send("Error retrieving departure data");
+      }
+      res.render("keberangkatan", { user: req.session.user, data: results, userTerminalName: "All" });
+    });
+  }
+});
+
+// API endpoint for realtime polling (optional)
+// GET /api/arrival
+app.get('/api/arrival', isAuthenticated, (req, res) => {
+  if (req.session.user.role === 'user') {
+    if (!req.session.user.terminal) return res.json([]);
+    pool.query("SELECT * FROM arrival WHERE terminal_id = ?", [req.session.user.terminal], (err, results) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).send("Error retrieving arrival data");
+      }
+      res.json(results);
+    });
+  } else {
+    pool.query("SELECT * FROM arrival", (err, results) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).send("Error retrieving arrival data");
+      }
+      res.json(results);
+    });
+  }
+});
+
+// GET /api/departure
+app.get('/api/departure', isAuthenticated, (req, res) => {
+  if (req.session.user.role === 'user') {
+    if (!req.session.user.terminal) return res.json([]);
+    pool.query("SELECT * FROM departure WHERE terminal_id = ?", [req.session.user.terminal], (err, results) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).send("Error retrieving departure data");
+      }
+      res.json(results);
+    });
+  } else {
+    pool.query("SELECT * FROM departure", (err, results) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).send("Error retrieving departure data");
+      }
+      res.json(results);
+    });
+  }
+});
+
+// --- WebSocket Handling --- //
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server, path: '/ws' });
 
-// WebSocket message handling with new structure
+// Helper: Save image file and return filename
+function saveImage(base64Str, licensePlate) {
+  const filename = Date.now() + "_" + licensePlate + ".jpg";
+  const filePath = path.join(__dirname, "public", "uploads", filename);
+  fs.writeFileSync(filePath, Buffer.from(base64Str, "base64"));
+  return filename;
+}
+
 wss.on('connection', (ws, req) => {
   console.log("New WebSocket connection established");
-  
   ws.on('message', (message) => {
     console.log("Received message:", message);
     try {
       const data = JSON.parse(message);
-      // Expected structure of data:
+      // Expected structure:
       // { terminal_id, is_departure, license_text, frame, timestamp }
       const terminal_id = data.terminal_id;
       const is_departure = data.is_departure;
@@ -226,8 +382,9 @@ wss.on('connection', (ws, req) => {
       const frame = data.frame;
       const timestamp = data.timestamp; // "%Y-%m-%d %H:%M:%S"
       
-      // Split timestamp into date and time (HH:MM)
-      const [tanggal, jam] = timestamp.split(" ");
+      // Split timestamp into tanggal and jam (HH:MM)
+      const [tanggal, timePart] = timestamp.split(" ");
+      const jam = timePart.substring(0,5);
       
       // Check if bus exists
       pool.query("SELECT * FROM bus WHERE UPPER(nomor_polisi) = ?", [license_text], (err, results) => {
@@ -242,40 +399,30 @@ wss.on('connection', (ws, req) => {
               console.error("Error inserting new bus:", err);
               return;
             }
-            processRecord();
+            processRecord(license_text);
           });
         } else {
-          processRecord();
+          processRecord(license_text);
         }
         
-        function processRecord() {
-          // Save image to disk
-          const filename = Date.now() + "_" + license_text + ".jpg";
-          const filePath = path.join(__dirname, "public", "uploads", filename);
-          fs.writeFile(filePath, Buffer.from(frame, "base64"), (err) => {
+        function processRecord(license) {
+          // Save image to disk and get filename
+          const filename = saveImage(frame, license);
+          const tableName = is_departure ? "departure" : "arrival";
+          const insertQuery = `INSERT INTO ${tableName} (tanggal, jam, nomor_polisi, picture_path, terminal_id) VALUES (?, ?, ?, ?, ?)`;
+          pool.query(insertQuery, [tanggal, jam, license, filename, terminal_id], (err, result) => {
             if (err) {
-              console.error("Error saving image:", err);
-              return;
+              console.error("Error inserting record into " + tableName + ":", err);
+            } else {
+              console.log("Record inserted into " + tableName + " for bus", license);
             }
-            // Determine target table based on is_departure
-            const tableName = is_departure ? "departure" : "arrival";
-            const insertQuery = `INSERT INTO ${tableName} (tanggal, jam, nomor_polisi, picture_path, terminal_id) VALUES (?, ?, ?, ?, ?)`;
-            pool.query(insertQuery, [tanggal, jam, license_text, filename, terminal_id], (err, result) => {
-              if (err) {
-                console.error("Error inserting record into " + tableName + ":", err);
-              } else {
-                console.log("Record inserted into " + tableName + " for bus", license_text);
-              }
-            });
           });
         }
       });
-      
     } catch (e) {
       console.error("Error parsing WebSocket message:", e);
     }
   });
-  
   ws.on('close', () => {
     console.log("WebSocket connection closed");
   });
