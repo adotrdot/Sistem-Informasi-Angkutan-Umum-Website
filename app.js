@@ -6,6 +6,7 @@ const bodyParser = require('body-parser');
 const mysql = require('mysql2');
 const http = require('http');
 const WebSocket = require('ws');
+const fs = require('fs');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -22,7 +23,7 @@ const pool = mysql.createPool({
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Middleware
+// Serve static files
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({
@@ -209,22 +210,72 @@ app.get('/logout', (req, res) => {
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server, path: '/ws' });
 
+// WebSocket message handling with new structure
 wss.on('connection', (ws, req) => {
   console.log("New WebSocket connection established");
+  
   ws.on('message', (message) => {
     console.log("Received message:", message);
     try {
       const data = JSON.parse(message);
-      // Broadcast the data to all connected clients.
-      wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(JSON.stringify(data));
+      // Expected structure of data:
+      // { terminal_id, is_departure, license_text, frame, timestamp }
+      const terminal_id = data.terminal_id;
+      const is_departure = data.is_departure;
+      const license_text = data.license_text.trim().toUpperCase();
+      const frame = data.frame;
+      const timestamp = data.timestamp; // "%Y-%m-%d %H:%M:%S"
+      
+      // Split timestamp into date and time (HH:MM)
+      const [tanggal, jam] = timestamp.split(" ");
+      
+      // Check if bus exists
+      pool.query("SELECT * FROM bus WHERE UPPER(nomor_polisi) = ?", [license_text], (err, results) => {
+        if (err) {
+          console.error("Error querying bus:", err);
+          return;
+        }
+        if (results.length === 0) {
+          // Insert new bus with license_text; other columns set to NULL.
+          pool.query("INSERT INTO bus (nomor_polisi, id_PO, terminal_asal, terminal_tujuan) VALUES (?, NULL, NULL, NULL)", [license_text], (err, insertResult) => {
+            if (err) {
+              console.error("Error inserting new bus:", err);
+              return;
+            }
+            processRecord();
+          });
+        } else {
+          processRecord();
+        }
+        
+        function processRecord() {
+          // Save image to disk
+          const filename = Date.now() + "_" + license_text + ".jpg";
+          const filePath = path.join(__dirname, "public", "uploads", filename);
+          fs.writeFile(filePath, Buffer.from(frame, "base64"), (err) => {
+            if (err) {
+              console.error("Error saving image:", err);
+              return;
+            }
+            // Determine target table based on is_departure
+            const tableName = is_departure ? "departure" : "arrival";
+            const insertQuery = `INSERT INTO ${tableName} (tanggal, jam, nomor_polisi, picture_path, terminal_id) VALUES (?, ?, ?, ?, ?)`;
+            pool.query(insertQuery, [tanggal, jam, license_text, filename, terminal_id], (err, result) => {
+              if (err) {
+                console.error("Error inserting record into " + tableName + ":", err);
+              } else {
+                console.log("Record inserted into " + tableName + " for bus", license_text);
+              }
+            });
+          });
         }
       });
+      
     } catch (e) {
       console.error("Error parsing WebSocket message:", e);
     }
   });
+  
   ws.on('close', () => {
     console.log("WebSocket connection closed");
   });
