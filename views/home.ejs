@@ -40,44 +40,8 @@
   </style>
 </head>
 <body>
-  <!-- Sidebar -->
-  <div class="sidebar">
-    <div class="sidebar-brand">
-      <h2>Bus Terminal</h2>
-    </div>
-    <ul class="nav flex-column mt-4">
-      <!-- Dashboard Link -->
-      <li class="nav-item mb-2">
-        <a class="nav-link active" href="/home">
-          <i class="fas fa-tachometer-alt"></i> Dashboard
-        </a>
-      </li>
-      <!-- Data Kedatangan Link -->
-      <li class="nav-item mb-2">
-        <a class="nav-link" href="/kedatangan">
-          <i class="fas fa-sign-in-alt"></i> Data Kedatangan
-        </a>
-      </li>
-      <!-- Data Keberangkatan Link -->
-      <li class="nav-item mb-2">
-        <a class="nav-link" href="/keberangkatan">
-          <i class="fas fa-sign-out-alt"></i> Data Keberangkatan
-        </a>
-      </li>
-      <% if (user.role === 'admin') { %>
-      <li class="nav-item mb-2">
-        <a class="nav-link" href="/admin">
-          <i class="fas fa-user-cog"></i> Admin
-        </a>
-      </li>
-      <% } %>
-      <li class="nav-item mt-4">
-        <a class="nav-link text-danger" href="/logout">
-          <i class="fas fa-sign-out-alt"></i> Logout
-        </a>
-      </li>
-    </ul>
-  </div>
+  <!-- Include Sidebar Partial -->
+  <%- include('partials/sidebar', { active: 'home', user: user }) %>
 
   <!-- Main Content -->
   <div class="content">
@@ -133,7 +97,7 @@
 
   <!-- Bootstrap Bundle JS (includes Popper) -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
+  
   <% if (user.role === 'user') { %>
   <script>
     document.addEventListener("DOMContentLoaded", function() {
@@ -144,7 +108,7 @@
         terminalModal.show();
       }
     });
-
+    
     // Dependent dropdowns for forced terminal update modal.
     document.getElementById('modalProvinsi').addEventListener('change', function() {
       var provinsiId = this.value;
@@ -171,7 +135,7 @@
         kabupatenSelect.disabled = true;
       }
     });
-
+    
     document.getElementById('modalKabupaten').addEventListener('change', function() {
       var kabupatenId = this.value;
       var terminalSelect = document.getElementById('modalTerminal');
@@ -194,7 +158,7 @@
         terminalSelect.disabled = true;
       }
     });
-
+    
     // Forced terminal update form submission.
     document.getElementById('terminalForm').addEventListener('submit', function(e) {
       e.preventDefault();
@@ -215,8 +179,8 @@
       })
       .catch(error => console.error('Error updating terminal:', error));
     });
-
-    // WebSocket connection and message handling (only for non-admin users).
+    
+    // WebSocket connection and message handling for non-admin users.
     const wsProtocol = (location.protocol === "https:" ? "wss://" : "ws://");
     const ws = new WebSocket(wsProtocol + location.host + "/ws");
     let messageQueue = [];
@@ -237,8 +201,7 @@
           const msgText = data.is_departure ? "New Departure Record" : "New Arrival Record";
           enqueueSnackbar(msgText);
         } else if(data.action === "new_bus") {
-          // Scrap new bus workflow: ignore "new_bus" messages.
-          console.log("New bus workflow is disabled. Ignoring message.");
+          console.log("New bus workflow is disabled. Ignoring new_bus message.");
         }
       } catch (e) {
         console.error("Error parsing WebSocket message:", e);

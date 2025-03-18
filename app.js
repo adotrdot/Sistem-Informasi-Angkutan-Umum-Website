@@ -88,12 +88,17 @@ app.get('/home', isAuthenticated, (req, res) => {
 
 // GET /admin (requires login, admin only)
 app.get('/admin', isAuthenticated, (req, res) => {
-  if (req.session.user.role !== 'admin') return res.status(403).send('Forbidden');
+  if (req.session.user.role !== 'admin') {
+    return res.status(403).send('Forbidden');
+  }
+  
   pool.query('SELECT * FROM provinsi ORDER BY name', (err, provinsiList) => {
     if (err) {
       console.error(err);
       return res.send('Error retrieving provinsi');
     }
+    
+    // Query to join users with terminal, kabupaten, and provinsi.
     const query = `
       SELECT 
         u.id, 
@@ -107,12 +112,19 @@ app.get('/admin', isAuthenticated, (req, res) => {
       LEFT JOIN kabupaten k ON t.kabupaten_id = k.id
       LEFT JOIN provinsi p ON k.provinsi_id = p.id
     `;
+    
     pool.query(query, (err, users) => {
       if (err) {
         console.error(err);
         return res.send('Error retrieving users');
       }
-      res.render('admin', { users, error: null, provinsiList });
+      // Pass req.session.user as "user" to the template.
+      res.render('admin', { 
+        user: req.session.user, 
+        users: users, 
+        error: null, 
+        provinsiList: provinsiList 
+      });
     });
   });
 });
@@ -199,31 +211,41 @@ app.post('/user/update-terminal', isAuthenticated, (req, res) => {
 
 // GET /kedatangan (Data Kedatangan)
 app.get('/kedatangan', isAuthenticated, (req, res) => {
-  // For non-admin users without a linked terminal, redirect to /home.
+  // For non-admin users without a linked terminal, redirect to /home
   if (req.session.user.role === 'user' && (!req.session.user.terminal || req.session.user.terminal === "")) {
     return res.redirect('/home');
   }
   
+  // Base query joining arrival, bus, PO, and terminal tables (for asal, tujuan, and main terminal)
+  const baseQuery = `
+    SELECT 
+      DATE_FORMAT(a.tanggal, '%d-%m-%Y') AS tanggal, 
+      a.jam, 
+      IFNULL(po.nama_PO, '-') AS nama_PO, 
+      a.nomor_polisi, 
+      IFNULL(ta.nama_terminal, '-') AS asal, 
+      IFNULL(tt.nama_terminal, '-') AS tujuan, 
+      a.picture_path, 
+      a.terminal_id,
+      t_main.nama_terminal AS nama_terminal
+    FROM arrival a
+    LEFT JOIN bus b ON UPPER(a.nomor_polisi) = UPPER(b.nomor_polisi)
+    LEFT JOIN PO po ON b.id_PO = po.id
+    LEFT JOIN terminal ta ON b.terminal_asal = ta.id
+    LEFT JOIN terminal tt ON b.terminal_tujuan = tt.id
+    LEFT JOIN terminal t_main ON a.terminal_id = t_main.id
+  `;
+
   if (req.session.user.role === 'user') {
-    // Get the user's terminal name
+    // For non-admin users, get the user's terminal name for subtitle.
     pool.query("SELECT nama_terminal FROM terminal WHERE id = ?", [req.session.user.terminal], (err, termResults) => {
       if (err) {
         console.error(err);
         return res.send("Error retrieving terminal info");
       }
-      let userTerminalName = (termResults.length > 0) ? termResults[0].nama_terminal : "";
-      // Retrieve arrival data for this terminal, formatting the date on the SQL side.
-      const query = `
-        SELECT 
-          DATE_FORMAT(tanggal, '%d-%m-%Y') AS tanggal, 
-          jam, 
-          nomor_polisi,
-          '' AS nama_PO,
-          '' AS asal,
-          '' AS tujuan
-        FROM arrival
-        WHERE terminal_id = ?
-      `;
+      const userTerminalName = (termResults.length > 0) ? termResults[0].nama_terminal : "";
+      // Filter records by user's terminal.
+      const query = baseQuery + " WHERE a.terminal_id = ?";
       pool.query(query, [req.session.user.terminal], (err, results) => {
         if (err) {
           console.error(err);
@@ -233,18 +255,8 @@ app.get('/kedatangan', isAuthenticated, (req, res) => {
       });
     });
   } else {
-    // Admin sees all arrival data.
-    const query = `
-      SELECT 
-        DATE_FORMAT(tanggal, '%d-%m-%Y') AS tanggal, 
-        jam, 
-        nomor_polisi,
-        '' AS nama_PO,
-        '' AS asal,
-        '' AS tujuan
-      FROM arrival
-    `;
-    pool.query(query, (err, results) => {
+    // For admin, show all records.
+    pool.query(baseQuery, (err, results) => {
       if (err) {
         console.error(err);
         return res.send("Error retrieving arrival data");
@@ -261,26 +273,34 @@ app.get('/keberangkatan', isAuthenticated, (req, res) => {
     return res.redirect('/home');
   }
   
+  // Base query joining departure, bus, PO, and terminal tables (for asal, tujuan, and main terminal)
+  const baseQuery = `
+    SELECT 
+      DATE_FORMAT(a.tanggal, '%d-%m-%Y') AS tanggal, 
+      a.jam, 
+      IFNULL(po.nama_PO, '-') AS nama_PO, 
+      a.nomor_polisi, 
+      IFNULL(ta.nama_terminal, '-') AS asal, 
+      IFNULL(tt.nama_terminal, '-') AS tujuan, 
+      a.picture_path, 
+      a.terminal_id,
+      t_main.nama_terminal AS nama_terminal
+    FROM departure a
+    LEFT JOIN bus b ON UPPER(a.nomor_polisi) = UPPER(b.nomor_polisi)
+    LEFT JOIN PO po ON b.id_PO = po.id
+    LEFT JOIN terminal ta ON b.terminal_asal = ta.id
+    LEFT JOIN terminal tt ON b.terminal_tujuan = tt.id
+    LEFT JOIN terminal t_main ON a.terminal_id = t_main.id
+  `;
+
   if (req.session.user.role === 'user') {
-    // Get the user's terminal name.
     pool.query("SELECT nama_terminal FROM terminal WHERE id = ?", [req.session.user.terminal], (err, termResults) => {
       if (err) {
         console.error(err);
         return res.send("Error retrieving terminal info");
       }
-      let userTerminalName = (termResults.length > 0) ? termResults[0].nama_terminal : "";
-      // Retrieve departure data for this terminal with formatted date.
-      const query = `
-        SELECT 
-          DATE_FORMAT(tanggal, '%d-%m-%Y') AS tanggal, 
-          jam, 
-          nomor_polisi,
-          '' AS nama_PO,
-          '' AS asal,
-          '' AS tujuan
-        FROM departure
-        WHERE terminal_id = ?
-      `;
+      const userTerminalName = (termResults.length > 0) ? termResults[0].nama_terminal : "";
+      const query = baseQuery + " WHERE a.terminal_id = ?";
       pool.query(query, [req.session.user.terminal], (err, results) => {
         if (err) {
           console.error(err);
@@ -290,18 +310,7 @@ app.get('/keberangkatan', isAuthenticated, (req, res) => {
       });
     });
   } else {
-    // Admin sees all departure data.
-    const query = `
-      SELECT 
-        DATE_FORMAT(tanggal, '%d-%m-%Y') AS tanggal, 
-        jam, 
-        nomor_polisi,
-        '' AS nama_PO,
-        '' AS asal,
-        '' AS tujuan
-      FROM departure
-    `;
-    pool.query(query, (err, results) => {
+    pool.query(baseQuery, (err, results) => {
       if (err) {
         console.error(err);
         return res.send("Error retrieving departure data");
@@ -383,8 +392,7 @@ wss.on('connection', (ws, req) => {
       const timestamp = data.timestamp; // "%Y-%m-%d %H:%M:%S"
       
       // Split timestamp into tanggal and jam (HH:MM)
-      const [tanggal, timePart] = timestamp.split(" ");
-      const jam = timePart.substring(0,5);
+      const [tanggal, jam] = timestamp.split(" ");
       
       // Check if bus exists
       pool.query("SELECT * FROM bus WHERE UPPER(nomor_polisi) = ?", [license_text], (err, results) => {

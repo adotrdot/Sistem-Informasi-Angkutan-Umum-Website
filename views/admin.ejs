@@ -11,43 +11,8 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-  <!-- Sidebar -->
-  <div class="sidebar">
-    <div class="sidebar-brand">
-      <h2>Bus Terminal</h2>
-    </div>
-    <ul class="nav flex-column mt-4">
-      <!-- Dashboard Link -->
-      <li class="nav-item mb-2">
-        <a class="nav-link" href="/home">
-          <i class="fas fa-tachometer-alt"></i> Dashboard
-        </a>
-      </li>
-      <!-- Data Kedatangan Link -->
-      <li class="nav-item mb-2">
-        <a class="nav-link" href="/kedatangan">
-          <i class="fas fa-sign-in-alt"></i> Data Kedatangan
-        </a>
-      </li>
-      <!-- Data Keberangkatan Link -->
-      <li class="nav-item mb-2">
-        <a class="nav-link" href="/keberangkatan">
-          <i class="fas fa-sign-out-alt"></i> Data Keberangkatan
-        </a>
-      </li>
-      <!-- Admin Link (active) -->
-      <li class="nav-item mb-2">
-        <a class="nav-link active" href="/admin">
-          <i class="fas fa-user-cog"></i> Admin
-        </a>
-      </li>
-      <li class="nav-item mt-4">
-        <a class="nav-link text-danger" href="/logout">
-          <i class="fas fa-sign-out-alt"></i> Logout
-        </a>
-      </li>
-    </ul>
-  </div>
+  <!-- Include the Sidebar Partial -->
+  <%- include('partials/sidebar', { active: 'admin', user: user }) %>
 
   <!-- Main Content -->
   <div class="content">
@@ -76,7 +41,7 @@
                 <option value="user">User</option>
               </select>
             </div>
-            <!-- Note: For users, the terminal will be updated by them on first login -->
+            <!-- Note: For users, terminal info will be updated on first login -->
             <button type="submit" class="btn btn-success">Create User</button>
           </form>
         </div>
@@ -100,14 +65,14 @@
               </tr>
             </thead>
             <tbody>
-              <% users.forEach(function(user) { %>
+              <% users.forEach(function(u) { %>
                 <tr>
-                  <td><%= user.id %></td>
-                  <td><%= user.username %></td>
-                  <td><%= user.role %></td>
-                  <td><%= user.terminal_name ? user.terminal_name : '-' %></td>
-                  <td><%= user.kabupaten_name ? user.kabupaten_name : '-' %></td>
-                  <td><%= user.provinsi_name ? user.provinsi_name : '-' %></td>
+                  <td><%= u.id %></td>
+                  <td><%= u.username %></td>
+                  <td><%= u.role %></td>
+                  <td><%= u.terminal_name ? u.terminal_name : '-' %></td>
+                  <td><%= u.kabupaten_name ? u.kabupaten_name : '-' %></td>
+                  <td><%= u.provinsi_name ? u.provinsi_name : '-' %></td>
                 </tr>
               <% }); %>
             </tbody>
