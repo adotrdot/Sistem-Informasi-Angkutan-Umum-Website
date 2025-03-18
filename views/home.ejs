@@ -5,33 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Home - Bus Terminal</title>
   <link rel="stylesheet" href="/css/style.css">
+  <!-- Bootstrap 5 CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Font Awesome CDN -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-
   <!-- Sidebar -->
   <div class="sidebar">
     <div class="sidebar-brand">
       <h2>Bus Terminal</h2>
     </div>
     <ul class="nav flex-column mt-4">
-      <!-- Dashboard Link -->
       <li class="nav-item mb-2">
-        <a class="nav-link active" aria-current="page" href="/home">
+        <a class="nav-link active" href="/home">
           <i class="fas fa-tachometer-alt"></i> Dashboard
         </a>
       </li>
-      <!-- Admin Link (only if user is admin) -->
       <% if (user.role === 'admin') { %>
-        <li class="nav-item mb-2">
-          <a class="nav-link" href="/admin">
-            <i class="fas fa-user-cog"></i> Admin
-          </a>
-        </li>
+      <li class="nav-item mb-2">
+        <a class="nav-link" href="/admin">
+          <i class="fas fa-user-cog"></i> Admin
+        </a>
+      </li>
       <% } %>
-      <!-- Logout Link -->
       <li class="nav-item mt-4">
         <a class="nav-link text-danger" href="/logout">
           <i class="fas fa-sign-out-alt"></i> Logout
@@ -45,10 +42,158 @@
     <div class="container mt-4">
       <h1 class="mb-4">Welcome, <%= user.username %>!</h1>
       <p>This is the Bus Terminal Home page.</p>
+      <p>Waiting for incoming vehicle data...</p>
     </div>
   </div>
+
+  <!-- Forced Terminal Update Modal (only for non-admin users without a terminal) -->
+  <% if (user.role === 'user' && !user.terminal) { %>
+  <div class="modal fade" id="terminalModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="terminalModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="terminalModalLabel">Complete Terminal Information</h5>
+          <!-- No close (X) button -->
+        </div>
+        <div class="modal-body">
+          <form id="terminalForm">
+            <div class="mb-3">
+              <label for="modalProvinsi" class="form-label">Provinsi</label>
+              <select class="form-select" id="modalProvinsi" name="provinsi" required>
+                <option value="">Select Provinsi</option>
+                <% provinsiList.forEach(function(prov) { %>
+                  <option value="<%= prov.id %>"><%= prov.name %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label for="modalKabupaten" class="form-label">Kabupaten</label>
+              <select class="form-select" id="modalKabupaten" name="kabupaten" required disabled>
+                <option value="">Select Kabupaten</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label for="modalTerminal" class="form-label">Terminal</label>
+              <select class="form-select" id="modalTerminal" name="terminal" required disabled>
+                <option value="">Select Terminal</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-success">Submit</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- Bootstrap Bundle JS (includes Popper) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   
-  <!-- Optional: Bootstrap Icons JS if needed -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.js"></script>
+  <!-- WebSocket Connection Script -->
+  <script>
+    const wsProtocol = (location.protocol === "https:" ? "wss://" : "ws://");
+    const ws = new WebSocket(wsProtocol + location.host + "/ws");
+
+    ws.onopen = () => {
+      console.log("WebSocket connection established");
+    };
+
+    ws.onmessage = event => {
+      console.log("Incoming message:", event.data);
+    };
+
+    ws.onerror = error => {
+      console.error("WebSocket error:", error);
+    };
+
+    ws.onclose = () => {
+      console.log("WebSocket connection closed");
+    };
+  </script>
+
+  <% if (user.role === 'user' && !user.terminal) { %>
+  <!-- Terminal Update Modal Script -->
+  <script>
+    // Show the modal immediately upon page load.
+    var terminalModalEl = document.getElementById('terminalModal');
+    var terminalModal = new bootstrap.Modal(terminalModalEl);
+    terminalModal.show();
+
+    // Populate Kabupaten when a Provinsi is selected.
+    document.getElementById('modalProvinsi').addEventListener('change', function() {
+      var provinsiId = this.value;
+      var kabupatenSelect = document.getElementById('modalKabupaten');
+      var terminalSelect = document.getElementById('modalTerminal');
+      kabupatenSelect.innerHTML = '<option value="">Select Kabupaten</option>';
+      terminalSelect.innerHTML = '<option value="">Select Terminal</option>';
+      terminalSelect.disabled = true;
+      if (provinsiId) {
+        kabupatenSelect.disabled = false;
+        fetch('/get-kabupaten?provinsi_id=' + provinsiId)
+          .then(response => response.json())
+          .then(data => {
+            if (data.length === 0) {
+              console.log("No kabupaten found for provinsiId:", provinsiId);
+            }
+            data.forEach(function(item) {
+              var option = document.createElement('option');
+              option.value = item.id;
+              option.text = item.name;
+              kabupatenSelect.appendChild(option);
+            });
+          })
+          .catch(error => console.error('Error fetching kabupaten:', error));
+      } else {
+        kabupatenSelect.disabled = true;
+      }
+    });
+
+    // Populate Terminal when a Kabupaten is selected.
+    document.getElementById('modalKabupaten').addEventListener('change', function() {
+      var kabupatenId = this.value;
+      var terminalSelect = document.getElementById('modalTerminal');
+      terminalSelect.innerHTML = '<option value="">Select Terminal</option>';
+      if (kabupatenId) {
+        terminalSelect.disabled = false;
+        fetch('/get-terminal?kabupaten_id=' + kabupatenId)
+          .then(response => response.json())
+          .then(data => {
+            if (data.length === 0) {
+              console.log("No terminal found for kabupatenId:", kabupatenId);
+            }
+            data.forEach(function(item) {
+              var option = document.createElement('option');
+              option.value = item.id;
+              option.text = item.nama_terminal;
+              terminalSelect.appendChild(option);
+            });
+          })
+          .catch(error => console.error('Error fetching terminal:', error));
+      } else {
+        terminalSelect.disabled = true;
+      }
+    });
+
+    // Handle the form submission to update the user's terminal.
+    document.getElementById('terminalForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      var formData = new FormData(this);
+      fetch('/user/update-terminal', {
+        method: 'POST',
+        body: new URLSearchParams(formData)
+      })
+      .then(response => response.text())
+      .then(result => {
+        if (result === 'OK') {
+          terminalModal.hide();
+          location.reload();
+        } else {
+          alert('Error: ' + result);
+        }
+      })
+      .catch(error => console.error('Error updating terminal:', error));
+    });
+  </script>
+  <% } %>
 </body>
 </html>
