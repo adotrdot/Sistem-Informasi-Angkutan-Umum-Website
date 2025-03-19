@@ -25,6 +25,7 @@ app.set('views', path.join(__dirname, 'views'));
 
 // Middleware
 app.use(bodyParser.urlencoded({ extended: false }));
+app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({
   secret: 'your_secret_key',
@@ -37,8 +38,6 @@ function isAuthenticated(req, res, next) {
   if (req.session && req.session.user) return next();
   res.redirect('/login');
 }
-
-// --- Basic Routes --- //
 
 // Root route: redirect to home
 app.get('/', (req, res) => {
@@ -53,27 +52,28 @@ app.get('/login', (req, res) => {
 // POST /login
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
-  pool.query(
-    'SELECT * FROM users WHERE username = ? AND password = ?',
-    [username, password],
-    (err, results) => {
-      if (err) {
-        console.error(err);
-        return res.render('login', { error: 'An error occurred. Please try again.' });
-      }
-      if (results.length > 0) {
-        req.session.user = results[0];
-        return res.redirect('/home');
-      }
-      res.render('login', { error: 'Invalid credentials. Please try again.' });
+  pool.query('SELECT * FROM users WHERE username = ? AND password = ?', [username, password], (err, results) => {
+    if (err) {
+      console.error(err);
+      return res.render('login', { error: 'An error occurred. Please try again.' });
     }
-  );
+    if (results.length > 0) {
+      req.session.user = results[0];
+      return res.redirect('/home');
+    }
+    res.render('login', { error: 'Invalid credentials. Please try again.' });
+  });
+});
+
+// GET /logout
+app.get('/logout', (req, res) => {
+  req.session.destroy();
+  res.redirect('/login');
 });
 
 // GET /home (requires login)
-// For non-admin users without a linked terminal, load provinsi list for the forced terminal update modal.
 app.get('/home', isAuthenticated, (req, res) => {
-  if (req.session.user.role === 'user' && !req.session.user.terminal) {
+  if (req.session.user.role === 'user' && (!req.session.user.terminal || req.session.user.terminal === "")) {
     pool.query('SELECT * FROM provinsi ORDER BY name', (err, provinsiList) => {
       if (err) {
         console.error(err);
@@ -86,11 +86,9 @@ app.get('/home', isAuthenticated, (req, res) => {
   }
 });
 
-// GET /admin (requires login, admin only)
-app.get('/admin', isAuthenticated, (req, res) => {
-  if (req.session.user.role !== 'admin') {
-    return res.status(403).send('Forbidden');
-  }
+// GET /user-management (User Management Panel - admin only)
+app.get('/user-management', isAuthenticated, (req, res) => {
+  if (req.session.user.role !== 'admin') return res.status(403).send('Forbidden');
   
   pool.query('SELECT * FROM provinsi ORDER BY name', (err, provinsiList) => {
     if (err) {
@@ -98,7 +96,6 @@ app.get('/admin', isAuthenticated, (req, res) => {
       return res.send('Error retrieving provinsi');
     }
     
-    // Query to join users with terminal, kabupaten, and provinsi.
     const query = `
       SELECT 
         u.id, 
@@ -118,8 +115,7 @@ app.get('/admin', isAuthenticated, (req, res) => {
         console.error(err);
         return res.send('Error retrieving users');
       }
-      // Pass req.session.user as "user" to the template.
-      res.render('admin', { 
+      res.render('userManagement', { 
         user: req.session.user, 
         users: users, 
         error: null, 
@@ -129,14 +125,12 @@ app.get('/admin', isAuthenticated, (req, res) => {
   });
 });
 
-// POST /admin/create-user (admin only)
-// New user creation: only username, password, and role are collected.
-// For role "user", the terminal field is set to NULL so the user can update it later.
-app.post('/admin/create-user', isAuthenticated, (req, res) => {
+// POST /user-management/create-user (admin only)
+app.post('/user-management/create-user', isAuthenticated, (req, res) => {
   if (req.session.user.role !== 'admin') return res.status(403).send('Forbidden');
   const { username, password, role } = req.body;
   if (!username || !password || !role) {
-    return res.render('admin', { users: [], error: 'Username, password, and role are required.', provinsiList: [] });
+    return res.render('userManagement', { users: [], error: 'Username, password, and role are required.', provinsiList: [] });
   }
   pool.query(
     'INSERT INTO users (username, password, role, terminal) VALUES (?, ?, ?, ?)',
@@ -144,21 +138,14 @@ app.post('/admin/create-user', isAuthenticated, (req, res) => {
     (err, result) => {
       if (err) {
         console.error(err);
-        return res.render('admin', { users: [], error: 'Error creating user.', provinsiList: [] });
+        return res.render('userManagement', { users: [], error: 'Error creating user.', provinsiList: [] });
       }
-      res.redirect('/admin');
+      res.redirect('/user-management');
     }
   );
 });
 
-// GET /logout
-app.get('/logout', (req, res) => {
-  req.session.destroy();
-  res.redirect('/login');
-});
-
-// GET /get-kabupaten (accessible to any authenticated user)
-// Returns all kabupaten for a given provinsi_id.
+// GET /get-kabupaten (for dependent dropdowns)
 app.get('/get-kabupaten', isAuthenticated, (req, res) => {
   const provinsiId = req.query.provinsi_id;
   pool.query('SELECT id, name FROM kabupaten WHERE provinsi_id = ?', [provinsiId], (err, results) => {
@@ -170,8 +157,7 @@ app.get('/get-kabupaten', isAuthenticated, (req, res) => {
   });
 });
 
-// GET /get-terminal (accessible to any authenticated user)
-// Returns all terminals for a given kabupaten_id.
+// GET /get-terminal (for dependent dropdowns)
 app.get('/get-terminal', isAuthenticated, (req, res) => {
   const kabupatenId = req.query.kabupaten_id;
   pool.query('SELECT id, nama_terminal FROM terminal WHERE kabupaten_id = ?', [kabupatenId], (err, results) => {
@@ -184,30 +170,19 @@ app.get('/get-terminal', isAuthenticated, (req, res) => {
 });
 
 // POST /user/update-terminal (for non-admin users)
-// Updates the user's terminal with the provided terminal ID.
 app.post('/user/update-terminal', isAuthenticated, (req, res) => {
-  if (req.session.user.role !== 'user') {
-    return res.status(403).send('Forbidden');
-  }
+  if (req.session.user.role !== 'user') return res.status(403).send('Forbidden');
   const { terminal } = req.body;
-  if (!terminal) {
-    return res.status(400).send('Terminal is required.');
-  }
-  pool.query(
-    'UPDATE users SET terminal = ? WHERE id = ?',
-    [terminal, req.session.user.id],
-    (err, result) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).send('Error updating terminal.');
-      }
-      req.session.user.terminal = terminal;
-      res.send('OK');
+  if (!terminal) return res.status(400).send('Terminal is required.');
+  pool.query('UPDATE users SET terminal = ? WHERE id = ?', [terminal, req.session.user.id], (err, result) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).send('Error updating terminal.');
     }
-  );
+    req.session.user.terminal = terminal;
+    res.send('OK');
+  });
 });
-
-// --- New Pages and API Endpoints --- //
 
 // GET /kedatangan (Data Kedatangan)
 app.get('/kedatangan', isAuthenticated, (req, res) => {
@@ -216,13 +191,15 @@ app.get('/kedatangan', isAuthenticated, (req, res) => {
     return res.redirect('/home');
   }
   
-  // Base query joining arrival, bus, PO, and terminal tables (for asal, tujuan, and main terminal)
+  // Build base query without ORDER BY
   const baseQuery = `
     SELECT 
+      a.id AS id,
       DATE_FORMAT(a.tanggal, '%d-%m-%Y') AS tanggal, 
       a.jam, 
       IFNULL(po.nama_PO, '-') AS nama_PO, 
       a.nomor_polisi, 
+      IFNULL(b.jenis, '-') AS jenis,
       IFNULL(ta.nama_terminal, '-') AS asal, 
       IFNULL(tt.nama_terminal, '-') AS tujuan, 
       a.picture_path, 
@@ -235,17 +212,15 @@ app.get('/kedatangan', isAuthenticated, (req, res) => {
     LEFT JOIN terminal tt ON b.terminal_tujuan = tt.id
     LEFT JOIN terminal t_main ON a.terminal_id = t_main.id
   `;
-
+  
   if (req.session.user.role === 'user') {
-    // For non-admin users, get the user's terminal name for subtitle.
     pool.query("SELECT nama_terminal FROM terminal WHERE id = ?", [req.session.user.terminal], (err, termResults) => {
       if (err) {
         console.error(err);
         return res.send("Error retrieving terminal info");
       }
       const userTerminalName = (termResults.length > 0) ? termResults[0].nama_terminal : "";
-      // Filter records by user's terminal.
-      const query = baseQuery + " WHERE a.terminal_id = ?";
+      const query = baseQuery + " WHERE a.terminal_id = ? ORDER BY a.id DESC";
       pool.query(query, [req.session.user.terminal], (err, results) => {
         if (err) {
           console.error(err);
@@ -255,117 +230,62 @@ app.get('/kedatangan', isAuthenticated, (req, res) => {
       });
     });
   } else {
-    // For admin, show all records.
-    pool.query(baseQuery, (err, results) => {
+    const query = baseQuery + " ORDER BY a.id DESC";
+    pool.query(query, (err, results) => {
       if (err) {
         console.error(err);
         return res.send("Error retrieving arrival data");
       }
-      res.render("kedatangan", { user: req.session.user, data: results, userTerminalName: "All" });
+      res.render("kedatangan", { user: req.session.user, data: results, userTerminalName: "Semua" });
     });
   }
 });
 
-// GET /keberangkatan (Data Keberangkatan)
-app.get('/keberangkatan', isAuthenticated, (req, res) => {
-  // For non-admin users without a linked terminal, redirect to /home.
-  if (req.session.user.role === 'user' && (!req.session.user.terminal || req.session.user.terminal === "")) {
-    return res.redirect('/home');
+// POST /bus/update-license
+// Expects: { arrival_id, new_license }
+// Checks if new_license exists in the bus table; if not, inserts a new bus record with new_license (other fields as null).
+// Then updates the arrival record's nomor_polisi with new_license.
+app.post('/bus/update-license', isAuthenticated, (req, res) => {
+  const { arrival_id, new_license } = req.body;
+  if (!arrival_id || !new_license) {
+    return res.status(400).json({ success: false, error: 'Missing parameters' });
   }
   
-  // Base query joining departure, bus, PO, and terminal tables (for asal, tujuan, and main terminal)
-  const baseQuery = `
-    SELECT 
-      DATE_FORMAT(a.tanggal, '%d-%m-%Y') AS tanggal, 
-      a.jam, 
-      IFNULL(po.nama_PO, '-') AS nama_PO, 
-      a.nomor_polisi, 
-      IFNULL(ta.nama_terminal, '-') AS asal, 
-      IFNULL(tt.nama_terminal, '-') AS tujuan, 
-      a.picture_path, 
-      a.terminal_id,
-      t_main.nama_terminal AS nama_terminal
-    FROM departure a
-    LEFT JOIN bus b ON UPPER(a.nomor_polisi) = UPPER(b.nomor_polisi)
-    LEFT JOIN PO po ON b.id_PO = po.id
-    LEFT JOIN terminal ta ON b.terminal_asal = ta.id
-    LEFT JOIN terminal tt ON b.terminal_tujuan = tt.id
-    LEFT JOIN terminal t_main ON a.terminal_id = t_main.id
-  `;
-
-  if (req.session.user.role === 'user') {
-    pool.query("SELECT nama_terminal FROM terminal WHERE id = ?", [req.session.user.terminal], (err, termResults) => {
-      if (err) {
-        console.error(err);
-        return res.send("Error retrieving terminal info");
-      }
-      const userTerminalName = (termResults.length > 0) ? termResults[0].nama_terminal : "";
-      const query = baseQuery + " WHERE a.terminal_id = ?";
-      pool.query(query, [req.session.user.terminal], (err, results) => {
+  // Check if new_license exists in the bus table (case-insensitive)
+  pool.query("SELECT * FROM bus WHERE UPPER(nomor_polisi) = ?", [new_license.toUpperCase()], (err, results) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    
+    function updateArrival() {
+      pool.query("UPDATE arrival SET nomor_polisi = ? WHERE id = ?", [new_license, arrival_id], (err, result) => {
         if (err) {
           console.error(err);
-          return res.send("Error retrieving departure data");
+          return res.status(500).json({ success: false, error: 'Error updating arrival record' });
         }
-        res.render("keberangkatan", { user: req.session.user, data: results, userTerminalName: userTerminalName });
+        return res.json({ success: true });
       });
-    });
-  } else {
-    pool.query(baseQuery, (err, results) => {
-      if (err) {
-        console.error(err);
-        return res.send("Error retrieving departure data");
-      }
-      res.render("keberangkatan", { user: req.session.user, data: results, userTerminalName: "All" });
-    });
-  }
+    }
+    
+    if (results.length === 0) {
+      // Insert new bus record if not found.
+      pool.query("INSERT INTO bus (nomor_polisi, id_PO, terminal_asal, terminal_tujuan) VALUES (?, NULL, NULL, NULL)", [new_license], (err, insertResult) => {
+        if (err) {
+          console.error(err);
+          return res.status(500).json({ success: false, error: 'Error inserting new bus' });
+        }
+        updateArrival();
+      });
+    } else {
+      updateArrival();
+    }
+  });
 });
 
-// API endpoint for realtime polling (optional)
-// GET /api/arrival
-app.get('/api/arrival', isAuthenticated, (req, res) => {
-  if (req.session.user.role === 'user') {
-    if (!req.session.user.terminal) return res.json([]);
-    pool.query("SELECT * FROM arrival WHERE terminal_id = ?", [req.session.user.terminal], (err, results) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).send("Error retrieving arrival data");
-      }
-      res.json(results);
-    });
-  } else {
-    pool.query("SELECT * FROM arrival", (err, results) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).send("Error retrieving arrival data");
-      }
-      res.json(results);
-    });
-  }
-});
-
-// GET /api/departure
-app.get('/api/departure', isAuthenticated, (req, res) => {
-  if (req.session.user.role === 'user') {
-    if (!req.session.user.terminal) return res.json([]);
-    pool.query("SELECT * FROM departure WHERE terminal_id = ?", [req.session.user.terminal], (err, results) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).send("Error retrieving departure data");
-      }
-      res.json(results);
-    });
-  } else {
-    pool.query("SELECT * FROM departure", (err, results) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).send("Error retrieving departure data");
-      }
-      res.json(results);
-    });
-  }
-});
-
-// --- WebSocket Handling --- //
+// --------------------------
+// WebSocket Server Setup
+// --------------------------
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server, path: '/ws' });
 
@@ -379,20 +299,22 @@ function saveImage(base64Str, licensePlate) {
 
 wss.on('connection', (ws, req) => {
   console.log("New WebSocket connection established");
+  
   ws.on('message', (message) => {
     console.log("Received message:", message);
     try {
       const data = JSON.parse(message);
-      // Expected structure:
-      // { terminal_id, is_departure, license_text, frame, timestamp }
+      // Expected structure: { terminal_id, license_text, frame, timestamp }
       const terminal_id = data.terminal_id;
-      const is_departure = data.is_departure;
       const license_text = data.license_text.trim().toUpperCase();
       const frame = data.frame;
-      const timestamp = data.timestamp; // "%Y-%m-%d %H:%M:%S"
+      const timestamp = data.timestamp; // Format: "%Y-%m-%d %H:%M:%S"
       
-      // Split timestamp into tanggal and jam (HH:MM)
+      // Split timestamp into tanggal and jam (full time string)
       const [tanggal, jam] = timestamp.split(" ");
+      
+      // Always insert into the arrival table.
+      const tableName = "arrival";
       
       // Check if bus exists
       pool.query("SELECT * FROM bus WHERE UPPER(nomor_polisi) = ?", [license_text], (err, results) => {
@@ -414,9 +336,8 @@ wss.on('connection', (ws, req) => {
         }
         
         function processRecord(license) {
-          // Save image to disk and get filename
+          // Save image to disk and get filename.
           const filename = saveImage(frame, license);
-          const tableName = is_departure ? "departure" : "arrival";
           const insertQuery = `INSERT INTO ${tableName} (tanggal, jam, nomor_polisi, picture_path, terminal_id) VALUES (?, ?, ?, ?, ?)`;
           pool.query(insertQuery, [tanggal, jam, license, filename, terminal_id], (err, result) => {
             if (err) {
@@ -427,10 +348,12 @@ wss.on('connection', (ws, req) => {
           });
         }
       });
+      
     } catch (e) {
       console.error("Error parsing WebSocket message:", e);
     }
   });
+  
   ws.on('close', () => {
     console.log("WebSocket connection closed");
   });

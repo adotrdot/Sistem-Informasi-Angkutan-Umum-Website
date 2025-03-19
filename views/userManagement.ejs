@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Admin Panel - Bus Terminal</title>
+  <title>Panel Manajemen User - Bus Terminal</title>
   <link rel="stylesheet" href="/css/style.css">
   <!-- Bootstrap 5 CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -11,21 +11,21 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-  <!-- Include the Sidebar Partial -->
-  <%- include('partials/sidebar', { active: 'admin', user: user }) %>
+  <!-- Include Sidebar Partial with active set to 'user-management' -->
+  <%- include('partials/sidebar', { active: 'user-management', user: user }) %>
 
   <!-- Main Content -->
   <div class="content">
     <div class="container mt-4">
-      <h1>Admin Panel</h1>
+      <h1>Panel Manajemen User</h1>
       
-      <!-- Create New User Form -->
+      <!-- Create New User Form Card -->
       <div class="card mb-4">
         <div class="card-header">
           Create New User
         </div>
         <div class="card-body">
-          <form action="/admin/create-user" method="POST">
+          <form action="/user-management/create-user" method="POST">
             <div class="mb-3">
               <label for="username" class="form-label">Username</label>
               <input type="text" class="form-control" id="username" name="username" required>
@@ -47,7 +47,7 @@
         </div>
       </div>
       
-      <!-- Existing Users Table -->
+      <!-- Existing Users Table Card -->
       <div class="card">
         <div class="card-header">
           Existing Users

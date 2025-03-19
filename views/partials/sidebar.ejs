@@ -1,40 +1,55 @@
 <div class="sidebar">
-    <div class="sidebar-brand">
-      <h2>Bus Terminal</h2>
-    </div>
-    <ul class="nav flex-column mt-4">
-      <!-- Dashboard Link -->
-      <li class="nav-item mb-2">
-        <a class="nav-link <%= active === 'home' ? 'active' : '' %>" href="/home">
-          <i class="fas fa-home"></i> Dashboard
-        </a>
-      </li>
-      <!-- Data Kedatangan Link -->
-      <li class="nav-item mb-2">
-        <a class="nav-link <%= active === 'kedatangan' ? 'active' : '' %>" href="/kedatangan">
-          <i class="fas fa-sign-in-alt"></i> Data Kedatangan
-        </a>
-      </li>
-      <!-- Data Keberangkatan Link -->
-      <li class="nav-item mb-2">
-        <a class="nav-link <%= active === 'keberangkatan' ? 'active' : '' %>" href="/keberangkatan">
-          <i class="fas fa-sign-out-alt"></i> Data Keberangkatan
-        </a>
-      </li>
-      <% if (user.role === 'admin') { %>
-      <!-- Admin Link -->
-      <li class="nav-item mb-2">
-        <a class="nav-link <%= active === 'admin' ? 'active' : '' %>" href="/admin">
-          <i class="fas fa-user-cog"></i> Admin
-        </a>
-      </li>
-      <% } %>
-      <!-- Logout Link -->
-      <li class="nav-item mt-4">
-        <a class="nav-link text-danger" href="/logout">
-          <i class="fas fa-power-off"></i> Logout
-        </a>
-      </li>
-    </ul>
+  <!-- User Info at the Top -->
+  <div class="sidebar-user text-center text-muted mb-2">
+    <i class="fas fa-user"></i> <%= user.username %>
   </div>
   
+  <!-- Logos Side by Side -->
+  <div class="sidebar-logos">
+    <img src="/images/logo1.png" alt="Logo 1" class="sidebar-logo">
+    <img src="/images/logo2.png" alt="Logo 2" class="sidebar-logo">
+  </div>
+  
+  <!-- Divider between Logos and Navigation Links -->
+  <hr class="sidebar-divider">
+  
+  <!-- Navigation Links -->
+  <ul class="nav flex-column mt-4">
+    <li class="nav-item mb-2">
+      <a class="nav-link <%= active === 'home' ? 'active' : '' %>" href="/home">
+        <span class="sidebar-icon"><i class="fas fa-home"></i></span>
+        <span class="sidebar-text">Dashboard</span>
+      </a>
+    </li>
+    <li class="nav-item mb-2">
+      <a class="nav-link <%= active === 'kedatangan' ? 'active' : '' %>" href="/kedatangan">
+        <span class="sidebar-icon"><i class="fas fa-sign-in-alt"></i></span>
+        <span class="sidebar-text">Data Kedatangan</span>
+      </a>
+    </li>
+    <% if (user.role === 'admin') { %>
+      <li class="nav-item mb-2">
+        <a class="nav-link <%= active === 'user-management' ? 'active' : '' %>" href="/user-management">
+          <span class="sidebar-icon"><i class="fas fa-user-cog"></i></span>
+          <span class="sidebar-text">Manajemen User</span>
+        </a>
+      </li>
+    <% } %>
+  </ul>
+  
+  <!-- Divider before Logout -->
+  <hr class="sidebar-divider">
+  
+  <!-- Logout Link -->
+  <div class="sidebar-logout">
+    <a class="nav-link text-danger" href="/logout">
+      <span class="sidebar-icon"><i class="fas fa-power-off"></i></span>
+      <span class="sidebar-text">Logout</span>
+    </a>
+  </div>
+  
+  <!-- Footer Text at the Bottom -->
+  <div class="sidebar-footer">
+    Sistem Pendataan Terminal Otomatis
+  </div>
+</div>
