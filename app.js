@@ -232,6 +232,56 @@ app.post('/manajemen-terminal/create', isAuthenticated, (req, res) => {
   );
 });
 
+// GET /manajemen-po (Manajemen PO Page)
+app.get('/manajemen-po', isAuthenticated, (req, res) => {
+  if (req.session.user.role !== 'admin') {
+    return res.status(403).send('Forbidden');
+  }
+  
+  pool.query("SELECT id, nama_PO FROM PO ORDER BY nama_PO ASC", (err, poList) => {
+    if (err) {
+      console.error(err);
+      return res.send("Error retrieving PO list");
+    }
+    res.render("manajemenPO", { user: req.session.user, poList: poList });
+  });
+});
+
+// POST /manajemen-po/create (Create New PO)
+app.post('/manajemen-po/create', isAuthenticated, (req, res) => {
+  if (req.session.user.role !== 'admin') {
+    return res.status(403).send('Forbidden');
+  }
+  
+  const { namaPO } = req.body;
+  if (!namaPO) {
+    return res.send("Nama PO wajib diisi.");
+  }
+  
+  const newPOName = namaPO.trim();
+  
+  // Check if the PO already exists (case-insensitive)
+  pool.query("SELECT * FROM PO WHERE LOWER(nama_PO) = ?", [newPOName.toLowerCase()], (err, results) => {
+    if (err) {
+      console.error(err);
+      return res.send("Database error.");
+    }
+    
+    if (results.length > 0) {
+      return res.send("PO sudah ada.");
+    }
+    
+    // Insert the new PO
+    pool.query("INSERT INTO PO (nama_PO) VALUES (?)", [newPOName], (err, insertResult) => {
+      if (err) {
+        console.error(err);
+        return res.send("Error inserting new PO.");
+      }
+      res.redirect('/manajemen-po');
+    });
+  });
+});
+
 // GET /get-kabupaten (for dependent dropdowns)
 app.get('/get-kabupaten', isAuthenticated, (req, res) => {
   const provinsiId = req.query.provinsi_id;
