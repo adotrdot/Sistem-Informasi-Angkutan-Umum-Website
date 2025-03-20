@@ -29,6 +29,12 @@
     </li>
     <% if (user.role === 'admin') { %>
       <li class="nav-item mb-2">
+        <a class="nav-link <%= active === 'manajemen-terminal' ? 'active' : '' %>" href="/manajemen-terminal">
+          <span class="sidebar-icon"><i class="fas fa-building"></i></span>
+          <span class="sidebar-text">Manajemen Terminal</span>
+        </a>
+      </li>
+      <li class="nav-item mb-2">
         <a class="nav-link <%= active === 'user-management' ? 'active' : '' %>" href="/user-management">
           <span class="sidebar-icon"><i class="fas fa-user-cog"></i></span>
           <span class="sidebar-text">Manajemen User</span>
