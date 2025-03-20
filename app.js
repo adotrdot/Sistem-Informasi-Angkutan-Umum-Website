@@ -328,6 +328,119 @@ app.get('/kedatangan', isAuthenticated, (req, res) => {
   }
 });
 
+// GET /edit-bus-data/:arrivalId
+app.get('/edit-bus-data/:arrivalId', isAuthenticated, (req, res) => {
+  const arrivalId = req.params.arrivalId;
+  // Get the arrival record to retrieve nomor_polisi and capture picture.
+  const arrivalQuery = "SELECT * FROM arrival WHERE id = ?";
+  pool.query(arrivalQuery, [arrivalId], (err, arrivalResults) => {
+    if (err) {
+      console.error(err);
+      return res.send("Error retrieving arrival record.");
+    }
+    if (arrivalResults.length === 0) {
+      return res.send("Arrival record not found.");
+    }
+    const arrivalRecord = arrivalResults[0];
+    const nomorPolisi = arrivalRecord.nomor_polisi;
+    // Get the bus record matching the nomor_polisi (case-insensitive)
+    const busQuery = "SELECT * FROM bus WHERE UPPER(nomor_polisi) = ?";
+    pool.query(busQuery, [nomorPolisi.toUpperCase()], (err, busResults) => {
+      if (err) {
+        console.error(err);
+        return res.send("Error retrieving bus record.");
+      }
+      if (busResults.length === 0) {
+        return res.send("Bus record not found.");
+      }
+      const busRecord = busResults[0];
+      // Retrieve list of PO's
+      pool.query("SELECT id, nama_PO FROM PO ORDER BY nama_PO ASC", (err, poList) => {
+        if (err) {
+          console.error(err);
+          return res.send("Error retrieving PO list.");
+        }
+        // Retrieve list of Provinsi for cascading dropdowns.
+        pool.query("SELECT id, name FROM provinsi ORDER BY name ASC", (err, provinsiList) => {
+          if (err) {
+            console.error(err);
+            return res.send("Error retrieving provinsi list.");
+          }
+          res.render("editBusData", { 
+            user: req.session.user, 
+            arrival: arrivalRecord,   // contains picture_path and nomor_polisi
+            bus: busRecord,           // contains id_PO, jenis, terminal_asal, terminal_tujuan
+            poList: poList, 
+            provinsiList: provinsiList 
+          });
+        });
+      });
+    });
+  });
+});
+
+// POST /edit-bus-data/:arrivalId
+app.post('/edit-bus-data/:arrivalId', isAuthenticated, (req, res) => {
+  const arrivalId = req.params.arrivalId;
+  // Destructure form fields from the request body.
+  const { poInput, terminalAsal, terminalTujuan, jenis } = req.body;
+  
+  // Retrieve the arrival record to obtain nomor_polisi.
+  pool.query("SELECT nomor_polisi FROM arrival WHERE id = ?", [arrivalId], (err, arrivalResults) => {
+    if (err) {
+      console.error(err);
+      return res.send("Error retrieving arrival record.");
+    }
+    if (arrivalResults.length === 0) {
+      return res.send("Arrival record not found.");
+    }
+    
+    const nomor_polisi = arrivalResults[0].nomor_polisi;
+    const poInputValue = poInput.trim();
+    const lowerPO = poInputValue.toLowerCase();
+    
+    // Check if the provided PO exists (case-insensitive)
+    pool.query("SELECT id FROM PO WHERE LOWER(nama_PO) = ?", [lowerPO], (err, poResults) => {
+      if (err) {
+        console.error(err);
+        return res.send("Error retrieving PO record.");
+      }
+      
+      // Function to update the bus record using a given PO id.
+      function updateBusRecord(id_PO) {
+        const updateQuery = `
+          UPDATE bus 
+          SET id_PO = ?, jenis = ?, terminal_asal = ?, terminal_tujuan = ?
+          WHERE UPPER(nomor_polisi) = ?
+        `;
+        pool.query(updateQuery, [id_PO, jenis, terminalAsal, terminalTujuan, nomor_polisi.toUpperCase()], (err, result) => {
+          if (err) {
+            console.error(err);
+            return res.send("Error updating bus record.");
+          }
+          res.redirect('/kedatangan');
+        });
+      }
+      
+      if (poResults.length > 0) {
+        // PO exists; use its id.
+        const poId = poResults[0].id;
+        updateBusRecord(poId);
+      } else {
+        // PO does not exist; insert a new PO.
+        pool.query("INSERT INTO PO (nama_PO) VALUES (?)", [poInputValue], (err, insertResult) => {
+          if (err) {
+            console.error(err);
+            return res.send("Error inserting new PO.");
+          }
+          const newPOId = insertResult.insertId;
+          updateBusRecord(newPOId);
+        });
+      }
+    });
+  });
+});
+
 // POST /bus/update-license
 // Expects: { arrival_id, new_license }
 // Checks if new_license exists in the bus table; if not, inserts a new bus record with new_license (other fields as null).

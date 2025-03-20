@@ -236,7 +236,8 @@
 
     // "Selanjutnya" button is a placeholder.
     document.getElementById("nextEditModal").addEventListener("click", function () {
-      alert("Selanjutnya functionality not implemented yet.");
+      const arrivalId = $('#editModal').data('arrival-id');
+      window.location.href = "/edit-bus-data/" + arrivalId;
     });
   </script>
 </body>
