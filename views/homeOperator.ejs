@@ -105,7 +105,7 @@
         <!-- Action Shortcuts -->
         <div class="card mb-4">
           <div class="card-body text-center">
-            <button class="btn btn-outline-primary" id="generatePdfBtn">Generate PDF Report</button>
+            <button class="btn btn-outline-primary" id="generateSpreadsheetBtn">Generate Spreadsheet</button>
           </div>
         </div>
         
@@ -170,7 +170,7 @@
         terminalModal.show();
       }
     });
-    
+
     $(document).ready(function(){
       $('#recentTable').DataTable({
         responsive: true,
@@ -262,6 +262,10 @@
         })
         .catch(error => console.error('Error updating terminal:', error));
       });
+    });
+
+    $('#generateSpreadsheetBtn').on('click', function(){
+      window.location.href = '/generate-spreadsheet-operator';
     });
   </script>
 </body>

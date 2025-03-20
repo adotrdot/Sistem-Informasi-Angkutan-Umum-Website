@@ -137,7 +137,7 @@
       <!-- Action Shortcuts Section -->
       <div class="card mb-4">
         <div class="card-body text-center">
-          <button class="btn btn-outline-primary" id="generatePdfBtn">Generate PDF Report</button>
+          <button class="btn btn-outline-primary" id="generateSpreadsheetBtn">Generate Spreadsheet</button>
         </div>
       </div>
       
@@ -168,8 +168,9 @@
         }
       });
       
-      $('#generatePdfBtn').on('click', function(){
-        alert("Fungsi Generate PDF belum diimplementasikan.");
+      $('#generateSpreadsheetBtn').on('click', function(){
+        // Redirect to the generate spreadsheet endpoint.
+        window.location.href = '/generate-spreadsheet';
       });
     });
   </script>

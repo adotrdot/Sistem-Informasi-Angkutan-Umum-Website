@@ -7,6 +7,7 @@ const mysql = require('mysql2');
 const http = require('http');
 const WebSocket = require('ws');
 const fs = require('fs');
+const ExcelJS = require('exceljs');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -837,6 +838,275 @@ app.post('/bus/update-license', isAuthenticated, (req, res) => {
     } else {
       updateArrival();
     }
+  });
+});
+
+// Generate Spreadsheet
+// GET /generate-spreadsheet
+app.get('/generate-spreadsheet', isAuthenticated, (req, res) => {
+  if (req.session.user.role !== 'admin') {
+    return res.status(403).send("Forbidden");
+  }
+  
+  // SQL query to retrieve all arrival records with associated info.
+  const query = `
+    SELECT 
+      DATE_FORMAT(a.tanggal, '%d-%m-%Y') AS tanggal,
+      a.jam,
+      t_kedatangan.nama_terminal AS terminal_kedatangan,
+      IFNULL(po.nama_PO, '-') AS nama_PO,
+      a.nomor_polisi,
+      t_asal.nama_terminal AS terminal_asal,
+      t_tujuan.nama_terminal AS terminal_tujuan,
+      CASE b.jenis 
+        WHEN 1 THEN 'AKAP'
+        WHEN 2 THEN 'AKDP'
+        WHEN 3 THEN 'ANKOT'
+        ELSE '-' 
+      END AS jenis
+    FROM arrival a
+    LEFT JOIN bus b ON UPPER(a.nomor_polisi) = UPPER(b.nomor_polisi)
+    LEFT JOIN PO po ON b.id_PO = po.id
+    LEFT JOIN terminal t_kedatangan ON a.terminal_id = t_kedatangan.id
+    LEFT JOIN terminal t_asal ON b.terminal_asal = t_asal.id
+    LEFT JOIN terminal t_tujuan ON b.terminal_tujuan = t_tujuan.id
+    ORDER BY a.id DESC
+  `;
+  
+  pool.query(query, (err, results) => {
+    if(err) {
+      console.error(err);
+      return res.status(500).send("Error retrieving arrival records");
+    }
+    
+    let workbook = new ExcelJS.Workbook();
+    let worksheet = workbook.addWorksheet('Laporan Kedatangan');
+
+    // Total number of columns (we have 8 columns)
+    const totalColumns = 8;
+    
+    // Title Row: merge A1 to H1
+    worksheet.mergeCells(1, 1, 1, totalColumns);
+    let titleCell = worksheet.getCell('A1');
+    titleCell.value = 'Laporan Kedatangan';
+    titleCell.font = { size: 16, bold: true };
+    titleCell.alignment = { horizontal: 'center' };
+    
+    // Subtitle Row: merge A2 to H2 with timestamp
+    const now = new Date();
+    const pad = n => n.toString().padStart(2, '0');
+    const timestampStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    worksheet.mergeCells(2, 1, 2, totalColumns);
+    let subtitleCell = worksheet.getCell('A2');
+    subtitleCell.value = `Laporan ini dibuat pada ${timestampStr}`;
+    subtitleCell.font = { size: 12, bold: true };
+    subtitleCell.alignment = { horizontal: 'center' };
+    
+    // Blank row (Row 3)
+    worksheet.addRow([]);
+    
+    // Header Row (Row 4)
+    const headers = [
+      'Tanggal',
+      'Jam',
+      'Terminal Kedatangan',
+      'Nama PO',
+      'Nomor Polisi',
+      'Terminal Asal',
+      'Terminal Tujuan',
+      'Jenis'
+    ];
+    let headerRow = worksheet.addRow(headers);
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true };
+      cell.fill = {
+        type: 'pattern',
+        pattern:'solid',
+        fgColor:{ argb:'FFCCCCCC' }
+      };
+      cell.alignment = { horizontal: 'center' };
+    });
+    
+    // Data Rows (starting from Row 5)
+    results.forEach(record => {
+      // Instead of passing the object, we pass an array in the correct order.
+      worksheet.addRow([
+        record.tanggal,
+        record.jam,
+        record.terminal_kedatangan,
+        record.nama_PO,
+        record.nomor_polisi,
+        record.terminal_asal,
+        record.terminal_tujuan,
+        record.jenis
+      ]);
+    });
+    
+    // Set column widths (optional)
+    worksheet.getColumn(1).width = 15;
+    worksheet.getColumn(2).width = 10;
+    worksheet.getColumn(3).width = 20;
+    worksheet.getColumn(4).width = 20;
+    worksheet.getColumn(5).width = 15;
+    worksheet.getColumn(6).width = 20;
+    worksheet.getColumn(7).width = 20;
+    worksheet.getColumn(8).width = 10;
+    
+    // Generate filename with timestamp
+    const ts = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    const filename = `Laporan_Kedatangan_${ts}.xlsx`;
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    
+    workbook.xlsx.write(res)
+      .then(() => res.end())
+      .catch(err => {
+        console.error(err);
+        res.status(500).send("Error generating spreadsheet");
+      });
+  });
+});
+
+// GET /generate-spreadsheet-operator
+app.get('/generate-spreadsheet-operator', isAuthenticated, (req, res) => {
+  // Ensure user is an operator and has a linked terminal.
+  if (req.session.user.role !== 'user') {
+    return res.status(403).send("Forbidden");
+  }
+  if (!req.session.user.terminal) {
+    return res.status(400).send("Terminal belum ditetapkan.");
+  }
+  
+  const terminalId = req.session.user.terminal;
+  
+  // First, retrieve the terminal name for filename and title.
+  pool.query("SELECT nama_terminal FROM terminal WHERE id = ?", [terminalId], (err, terminalResults) => {
+    if (err || terminalResults.length === 0) {
+      console.error(err);
+      return res.status(500).send("Error retrieving terminal info");
+    }
+    const terminalName = terminalResults[0].nama_terminal;
+    
+    // Query arrival records for this terminal along with associated info.
+    const query = `
+      SELECT 
+        DATE_FORMAT(a.tanggal, '%d-%m-%Y') AS tanggal,
+        a.jam,
+        t_kedatangan.nama_terminal AS terminal_kedatangan,
+        IFNULL(po.nama_PO, '-') AS nama_PO,
+        a.nomor_polisi,
+        t_asal.nama_terminal AS terminal_asal,
+        t_tujuan.nama_terminal AS terminal_tujuan,
+        CASE b.jenis 
+          WHEN 1 THEN 'AKAP'
+          WHEN 2 THEN 'AKDP'
+          WHEN 3 THEN 'ANKOT'
+          ELSE '-' 
+        END AS jenis
+      FROM arrival a
+      LEFT JOIN bus b ON UPPER(a.nomor_polisi) = UPPER(b.nomor_polisi)
+      LEFT JOIN PO po ON b.id_PO = po.id
+      LEFT JOIN terminal t_kedatangan ON a.terminal_id = t_kedatangan.id
+      LEFT JOIN terminal t_asal ON b.terminal_asal = t_asal.id
+      LEFT JOIN terminal t_tujuan ON b.terminal_tujuan = t_tujuan.id
+      WHERE a.terminal_id = ?
+      ORDER BY a.id DESC
+    `;
+    
+    pool.query(query, [terminalId], (err, results) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).send("Error retrieving arrival records");
+      }
+      
+      let workbook = new ExcelJS.Workbook();
+      let worksheet = workbook.addWorksheet('Laporan Kedatangan');
+
+      const totalColumns = 8; // We have 8 columns
+      
+      // Title Row: Merge A1 to H1, display "Laporan Kedatangan [terminalName]"
+      worksheet.mergeCells(1, 1, 1, totalColumns);
+      let titleCell = worksheet.getCell('A1');
+      titleCell.value = `Laporan Kedatangan ${terminalName}`;
+      titleCell.font = { size: 16, bold: true };
+      titleCell.alignment = { horizontal: 'center' };
+
+      // Subtitle Row: Merge A2 to H2, display timestamp message.
+      const now = new Date();
+      const pad = n => n.toString().padStart(2, '0');
+      const timestampStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+      worksheet.mergeCells(2, 1, 2, totalColumns);
+      let subtitleCell = worksheet.getCell('A2');
+      subtitleCell.value = `Laporan ini dibuat pada ${timestampStr}`;
+      subtitleCell.font = { size: 12, bold: true };
+      subtitleCell.alignment = { horizontal: 'center' };
+
+      // Blank row (Row 3)
+      worksheet.addRow([]);
+
+      // Header Row (Row 4)
+      const headers = [
+        'Tanggal',
+        'Jam',
+        'Terminal Kedatangan',
+        'Nama PO',
+        'Nomor Polisi',
+        'Terminal Asal',
+        'Terminal Tujuan',
+        'Jenis'
+      ];
+      let headerRow = worksheet.addRow(headers);
+      headerRow.eachCell((cell) => {
+        cell.font = { bold: true };
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFCCCCCC' } // Light gray background
+        };
+        cell.alignment = { horizontal: 'center' };
+      });
+
+      // Data Rows (starting from Row 5)
+      results.forEach(record => {
+        worksheet.addRow([
+          record.tanggal,
+          record.jam,
+          record.terminal_kedatangan,
+          record.nama_PO,
+          record.nomor_polisi,
+          record.terminal_asal,
+          record.terminal_tujuan,
+          record.jenis
+        ]);
+      });
+      
+      // Set column widths (optional)
+      worksheet.getColumn(1).width = 15; // Tanggal
+      worksheet.getColumn(2).width = 10; // Jam
+      worksheet.getColumn(3).width = 20; // Terminal Kedatangan
+      worksheet.getColumn(4).width = 20; // Nama PO
+      worksheet.getColumn(5).width = 15; // Nomor Polisi
+      worksheet.getColumn(6).width = 20; // Terminal Asal
+      worksheet.getColumn(7).width = 20; // Terminal Tujuan
+      worksheet.getColumn(8).width = 10; // Jenis
+
+      // Generate filename: "Laporan_Kedatangan_[TerminalName]_[timestamp].xlsx"
+      const ts = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      // Replace spaces with underscores in terminalName for safe filename
+      const safeTerminalName = terminalName.replace(/\s+/g, '_');
+      const filename = `Laporan_Kedatangan_${safeTerminalName}_${ts}.xlsx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+      
+      workbook.xlsx.write(res)
+        .then(() => res.end())
+        .catch(err => {
+          console.error(err);
+          res.status(500).send("Error generating spreadsheet");
+        });
+    });
   });
 });
 

@@ -96,19 +96,19 @@
               <label class="form-label">Jenis</label>
               <div>
                 <div class="form-check form-check-inline">
-                  <input class="form-check-input" type="radio" name="jenis" id="jenisAKAP" value="0" <%= bus.jenis == 0 ? "checked" : "" %>>
+                  <input class="form-check-input" type="radio" name="jenis" id="jenisAKAP" value="AKAP" <%= bus.jenis === 'AKAP' ? "checked" : "" %>>
                   <label class="form-check-label" for="jenisAKAP">AKAP</label>
                 </div>
                 <div class="form-check form-check-inline">
-                  <input class="form-check-input" type="radio" name="jenis" id="jenisAKDP" value="1" <%= bus.jenis == 1 ? "checked" : "" %>>
+                  <input class="form-check-input" type="radio" name="jenis" id="jenisAKDP" value="AKDP" <%= bus.jenis === 'AKDP' ? "checked" : "" %>>
                   <label class="form-check-label" for="jenisAKDP">AKDP</label>
                 </div>
                 <div class="form-check form-check-inline">
-                  <input class="form-check-input" type="radio" name="jenis" id="jenisANKOT" value="2" <%= bus.jenis == 2 ? "checked" : "" %>>
+                  <input class="form-check-input" type="radio" name="jenis" id="jenisANKOT" value="ANKOT" <%= bus.jenis === 'ANKOT' ? "checked" : "" %>>
                   <label class="form-check-label" for="jenisANKOT">ANKOT</label>
                 </div>
               </div>
-            </div>
+            </div>            
             
             <!-- Form Buttons -->
             <button type="submit" class="btn btn-primary">Submit</button>
