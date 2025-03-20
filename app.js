@@ -192,91 +192,93 @@ app.get('/home', isAuthenticated, (req, res) => {
         return res.render('homeOperator', { user: req.session.user, provinsiList: provinsiList });
       });
     } else {
-      // Retrieve the operator's terminal info, summary stats, and recent arrivals.
+      // User has a terminal assigned.
       const terminalId = req.session.user.terminal;
-      
-      // 1. Retrieve terminal information (Nama Terminal and Alamat)
+      // Retrieve terminal info.
       pool.query("SELECT nama_terminal, alamat FROM terminal WHERE id = ?", [terminalId], (err, terminalInfoResults) => {
         if (err) {
           console.error(err);
           return res.send("Error retrieving terminal information.");
         }
         const terminalInfo = terminalInfoResults[0];
-        
-        // 2. Retrieve summary statistics for arrivals at this terminal.
-        pool.query("SELECT COUNT(*) AS total FROM arrival WHERE terminal_id = ?", [terminalId], (err, totalRes) => {
+        // Retrieve provinsi list for the edit modal.
+        pool.query("SELECT id, name FROM provinsi ORDER BY name ASC", (err, provinsiList) => {
           if (err) {
             console.error(err);
-            return res.send("Error retrieving total arrivals.");
+            return res.send("Error retrieving provinsi list.");
           }
-          const userTotalArrivals = totalRes[0].total;
-          
-          pool.query(
-            "SELECT COUNT(*) AS total FROM arrival WHERE terminal_id = ? AND MONTH(tanggal) = MONTH(CURRENT_DATE()) AND YEAR(tanggal) = YEAR(CURRENT_DATE())",
-            [terminalId],
-            (err, monthRes) => {
-              if (err) {
-                console.error(err);
-                return res.send("Error retrieving arrivals this month.");
-              }
-              const userTotalArrivalsMonth = monthRes[0].total;
-              
-              pool.query(
-                "SELECT COUNT(*) AS total FROM arrival WHERE terminal_id = ? AND YEARWEEK(tanggal, 1) = YEARWEEK(CURRENT_DATE(), 1)",
-                [terminalId],
-                (err, weekRes) => {
-                  if (err) {
-                    console.error(err);
-                    return res.send("Error retrieving arrivals this week.");
-                  }
-                  const userTotalArrivalsWeek = weekRes[0].total;
-                  
-                  pool.query(
-                    "SELECT COUNT(*) AS total FROM arrival WHERE terminal_id = ? AND DATE(tanggal) = CURRENT_DATE()",
-                    [terminalId],
-                    (err, todayRes) => {
-                      if (err) {
-                        console.error(err);
-                        return res.send("Error retrieving arrivals today.");
-                      }
-                      const userTotalArrivalsToday = todayRes[0].total;
-                      
-                      // 3. Retrieve 5 most recent arrival records for this terminal.
-                      const recentQuery = `
-                        SELECT 
-                          a.id AS id,
-                          DATE_FORMAT(a.tanggal, '%d-%m-%Y') AS tanggal,
-                          a.jam,
-                          a.nomor_polisi,
-                          IFNULL(t_main.nama_terminal, '-') AS nama_terminal
-                        FROM arrival a
-                        LEFT JOIN terminal t_main ON a.terminal_id = t_main.id
-                        WHERE a.terminal_id = ?
-                        ORDER BY a.id DESC
-                        LIMIT 5
-                      `;
-                      pool.query(recentQuery, [terminalId], (err, recentArrivals) => {
+          // Retrieve summary statistics.
+          pool.query("SELECT COUNT(*) AS total FROM arrival WHERE terminal_id = ?", [terminalId], (err, totalRes) => {
+            if (err) {
+              console.error(err);
+              return res.send("Error retrieving total arrivals.");
+            }
+            const userTotalArrivals = totalRes[0].total;
+            pool.query(
+              "SELECT COUNT(*) AS total FROM arrival WHERE terminal_id = ? AND MONTH(tanggal) = MONTH(CURRENT_DATE()) AND YEAR(tanggal) = YEAR(CURRENT_DATE())",
+              [terminalId],
+              (err, monthRes) => {
+                if (err) {
+                  console.error(err);
+                  return res.send("Error retrieving arrivals this month.");
+                }
+                const userTotalArrivalsMonth = monthRes[0].total;
+                pool.query(
+                  "SELECT COUNT(*) AS total FROM arrival WHERE terminal_id = ? AND YEARWEEK(tanggal, 1) = YEARWEEK(CURRENT_DATE(), 1)",
+                  [terminalId],
+                  (err, weekRes) => {
+                    if (err) {
+                      console.error(err);
+                      return res.send("Error retrieving arrivals this week.");
+                    }
+                    const userTotalArrivalsWeek = weekRes[0].total;
+                    pool.query(
+                      "SELECT COUNT(*) AS total FROM arrival WHERE terminal_id = ? AND DATE(tanggal) = CURRENT_DATE()",
+                      [terminalId],
+                      (err, todayRes) => {
                         if (err) {
                           console.error(err);
-                          return res.send("Error retrieving recent arrivals.");
+                          return res.send("Error retrieving arrivals today.");
                         }
-                        // Render the operator dashboard view with the necessary variables.
-                        res.render("homeOperator", { 
-                          user: req.session.user,
-                          terminalInfo: terminalInfo,
-                          userTotalArrivals: userTotalArrivals,
-                          userTotalArrivalsMonth: userTotalArrivalsMonth,
-                          userTotalArrivalsWeek: userTotalArrivalsWeek,
-                          userTotalArrivalsToday: userTotalArrivalsToday,
-                          userRecentArrivals: recentArrivals
+                        const userTotalArrivalsToday = todayRes[0].total;
+                        // Retrieve the 5 most recent arrival records for this terminal.
+                        const recentQuery = `
+                          SELECT 
+                            a.id AS id,
+                            DATE_FORMAT(a.tanggal, '%d-%m-%Y') AS tanggal,
+                            a.jam,
+                            a.nomor_polisi,
+                            IFNULL(t_main.nama_terminal, '-') AS nama_terminal
+                          FROM arrival a
+                          LEFT JOIN terminal t_main ON a.terminal_id = t_main.id
+                          WHERE a.terminal_id = ?
+                          ORDER BY a.id DESC
+                          LIMIT 5
+                        `;
+                        pool.query(recentQuery, [terminalId], (err, recentArrivals) => {
+                          if (err) {
+                            console.error(err);
+                            return res.send("Error retrieving recent arrivals.");
+                          }
+                          // Render the operator dashboard.
+                          res.render("homeOperator", { 
+                            user: req.session.user,
+                            terminalInfo: terminalInfo,
+                            provinsiList: provinsiList,
+                            userTotalArrivals: userTotalArrivals,
+                            userTotalArrivalsMonth: userTotalArrivalsMonth,
+                            userTotalArrivalsWeek: userTotalArrivalsWeek,
+                            userTotalArrivalsToday: userTotalArrivalsToday,
+                            userRecentArrivals: recentArrivals
+                          });
                         });
-                      });
-                    }
-                  );
-                }
-              );
-            }
-          );
+                      }
+                    );
+                  }
+                );
+              }
+            );
+          });
         });
       });
     }
@@ -340,6 +342,28 @@ app.post('/user-management/create-user', isAuthenticated, (req, res) => {
       res.redirect('/user-management');
     }
   );
+});
+
+// DELETE /user-management/delete (admin only for deleting specific user)
+app.delete('/user-management/delete/:id', isAuthenticated, (req, res) => {
+  // Only allow admin to delete users
+  if (req.session.user.role !== 'admin') {
+    return res.status(403).json({ success: false, error: 'Forbidden' });
+  }
+  
+  const userId = req.params.id;
+  if (!userId) {
+    return res.status(400).json({ success: false, error: 'Missing user id.' });
+  }
+  
+  // Delete user query
+  pool.query("DELETE FROM users WHERE id = ?", [userId], (err, result) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ success: false, error: 'Error deleting user.' });
+    }
+    return res.json({ success: true });
+  });
 });
 
 // GET /manajemen-terminal (Manajemen Terminal Page)
@@ -520,6 +544,48 @@ app.post('/manajemen-po/create', isAuthenticated, (req, res) => {
       }
       res.redirect('/manajemen-po');
     });
+  });
+});
+
+// POST /manajemen-po/edit (Edit PO)
+app.post('/manajemen-po/edit', isAuthenticated, (req, res) => {
+  if (req.session.user.role !== 'admin') {
+    return res.status(403).json({ success: false, error: 'Forbidden' });
+  }
+  
+  const { poId, namaPO } = req.body;
+  if (!poId || !namaPO) {
+    return res.status(400).json({ success: false, error: 'Missing parameters.' });
+  }
+  
+  const updateQuery = "UPDATE PO SET nama_PO = ? WHERE id = ?";
+  pool.query(updateQuery, [namaPO.trim(), poId], (err, result) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ success: false, error: 'Error updating PO.' });
+    }
+    return res.json({ success: true });
+  });
+});
+
+// DELETE /manajemen-po/delete (Delete specific PO)
+app.delete('/manajemen-po/delete/:id', isAuthenticated, (req, res) => {
+  if (req.session.user.role !== 'admin') {
+    return res.status(403).json({ success: false, error: 'Forbidden' });
+  }
+  
+  const poId = req.params.id;
+  if (!poId) {
+    return res.status(400).json({ success: false, error: 'Missing PO id.' });
+  }
+  
+  const deleteQuery = "DELETE FROM PO WHERE id = ?";
+  pool.query(deleteQuery, [poId], (err, result) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ success: false, error: 'Error deleting PO.' });
+    }
+    return res.json({ success: true });
   });
 });
 
