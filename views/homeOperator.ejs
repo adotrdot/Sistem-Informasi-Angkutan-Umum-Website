@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard Operator - Sistem Pendataan Terminal Otomatis</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- DataTables CSS -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <!-- Include Sidebar Partial with active set to 'home' -->
+  <%- include('partials/sidebar', { active: 'home', user: user }) %>
+  
+  <!-- Main Content -->
+  <div class="content">
+    <div class="container mt-4">
+      <h1 class="mb-5">Dashboard Operator</h1>
+      
+      <!-- Overview: Terminal Information -->
+      <div class="card mb-4">
+        <div class="card-header">
+          Informasi Terminal
+        </div>
+        <div class="card-body">
+          <p><strong>Nama Terminal:</strong> <%= terminalInfo.nama_terminal %></p>
+          <p><strong>Alamat:</strong> <%= terminalInfo.alamat %></p>
+        </div>
+      </div>
+      
+      <!-- Summary Statistics -->
+      <div class="row">
+        <div class="col-md-3 mb-3">
+          <div class="card text-center">
+            <div class="card-body">
+              <h5 class="card-title">Total Kedatangan</h5>
+              <p class="card-text display-6"><%= userTotalArrivals || 0 %></p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3 mb-3">
+          <div class="card text-center">
+            <div class="card-body">
+              <h5 class="card-title">Kedatangan Bulan Ini</h5>
+              <p class="card-text display-6"><%= userTotalArrivalsMonth || 0 %></p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3 mb-3">
+          <div class="card text-center">
+            <div class="card-body">
+              <h5 class="card-title">Kedatangan Minggu Ini</h5>
+              <p class="card-text display-6"><%= userTotalArrivalsWeek || 0 %></p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3 mb-3">
+          <div class="card text-center">
+            <div class="card-body">
+              <h5 class="card-title">Kedatangan Hari Ini</h5>
+              <p class="card-text display-6"><%= userTotalArrivalsToday || 0 %></p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Recent Records -->
+      <div class="card mb-4">
+        <div class="card-header">
+          5 Kedatangan Terbaru di Terminal Anda
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table id="recentTable" class="display table table-striped">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Tanggal</th>
+                  <th>Jam</th>
+                  <th>Nomor Polisi</th>
+                  <th>Terminal</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% userRecentArrivals.forEach(function(rec) { %>
+                  <tr>
+                    <td><%= rec.id %></td>
+                    <td><%= rec.tanggal %></td>
+                    <td><%= rec.jam %></td>
+                    <td><%= rec.nomor_polisi %></td>
+                    <td><%= rec.nama_terminal || '-' %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Action Shortcuts -->
+      <div class="card mb-4">
+        <div class="card-body text-center">
+          <button class="btn btn-outline-primary" id="generatePdfBtn">Generate PDF Report</button>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+  
+  <!-- jQuery, DataTables, and Bootstrap JS -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    $(document).ready(function(){
+      $('#recentTable').DataTable({
+        responsive: true,
+        autoWidth: false,
+        ordering: false,
+        language: {
+          search: "Cari:",
+          lengthMenu: "Tampilkan _MENU_ entri",
+          info: "Menampilkan _START_ sampai _END_ dari _TOTAL_ entri",
+          infoEmpty: "Tidak ada data",
+          paginate: {
+            first: "Pertama",
+            last: "Terakhir",
+            next: "Berikutnya",
+            previous: "Sebelumnya"
+          }
+        }
+      });
+      
+      $('#generatePdfBtn').on('click', function(){
+        alert("Fungsi Generate PDF belum diimplementasikan.");
+      });
+    });
+  </script>
+</body>
+</html>

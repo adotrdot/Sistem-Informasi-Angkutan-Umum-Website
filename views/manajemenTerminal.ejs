@@ -78,16 +78,35 @@
               <thead>
                 <tr>
                   <th>Nama Terminal</th>
+                  <th>Alamat</th>
                   <th>Kabupaten</th>
                   <th>Provinsi</th>
+                  <th>Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 <% terminals.forEach(function(term) { %>
-                  <tr>
+                  <tr data-id="<%= term.id %>"
+                      data-nama="<%= term.nama_terminal %>"
+                      data-alamat="<%= term.alamat %>"
+                      data-kabupaten="<%= term.kabupaten_name %>"
+                      data-provinsi="<%= term.provinsi_name %>"
+                      data-provinsi-id="<%= term.provinsi_id %>"
+                      data-kabupaten-id="<%= term.kabupaten_id %>">
                     <td><%= term.nama_terminal %></td>
+                    <td><%= term.alamat %></td>
                     <td><%= term.kabupaten_name %></td>
                     <td><%= term.provinsi_name %></td>
+                    <td>
+                      <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-secondary edit-terminal-btn" title="Edit">
+                          <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger delete-terminal-btn" title="Delete">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 <% }); %>
               </tbody>
@@ -99,19 +118,92 @@
     </div>
   </div>
   
-  <!-- Error Modal for Duplicate Terminal -->
-  <div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
+  <!-- Edit Terminal Modal -->
+  <div class="modal fade" id="editTerminalModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="editTerminalModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
          <div class="modal-header">
-           <h5 class="modal-title" id="errorModalLabel">Peringatan</h5>
+           <h5 class="modal-title" id="editTerminalModalLabel">Edit Data Terminal</h5>
            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
          </div>
          <div class="modal-body">
-           <p id="errorModalMessage"></p>
+           <form id="editTerminalForm" action="/manajemen-terminal/edit" method="POST">
+             <!-- Hidden field for terminal ID -->
+             <input type="hidden" id="editTerminalId" name="terminalId">
+             
+             <div class="mb-3">
+               <label for="editNamaTerminal" class="form-label">Nama Terminal</label>
+               <input type="text" id="editNamaTerminal" name="namaTerminal" class="form-control" required>
+             </div>
+             <div class="mb-3">
+               <label for="editAlamat" class="form-label">Alamat</label>
+               <textarea id="editAlamat" name="alamat" class="form-control" rows="3" required></textarea>
+             </div>
+             <!-- Dropdown for Provinsi -->
+             <div class="mb-3">
+               <label for="editProvinsi" class="form-label">Provinsi</label>
+               <select id="editProvinsi" name="provinsi" class="form-select" required>
+                 <option value="">Pilih Provinsi</option>
+                 <% provinsiList.forEach(function(prov) { %>
+                   <option value="<%= prov.id %>"><%= prov.name %></option>
+                 <% }); %>
+               </select>
+             </div>
+             <!-- Dropdown for Kabupaten -->
+             <div class="mb-3">
+               <label for="editKabupaten" class="form-label">Kabupaten</label>
+               <select id="editKabupaten" name="kabupaten" class="form-select" required disabled>
+                 <option value="">Pilih Kabupaten</option>
+               </select>
+             </div>
+           </form>
          </div>
          <div class="modal-footer">
-           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+           <button type="submit" form="editTerminalForm" class="btn btn-primary" id="submitEditTerminalBtn">Submit</button>
+         </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Delete Terminal Modal -->
+  <div class="modal fade" id="deleteTerminalModal" tabindex="-1" aria-labelledby="deleteTerminalModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+         <div class="modal-header">
+           <h5 class="modal-title" id="deleteTerminalModalLabel">Konfirmasi Hapus Terminal</h5>
+           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+         </div>
+         <div class="modal-body">
+           <p>Apakah Anda yakin ingin menghapus terminal berikut?</p>
+           <ul>
+             <li><strong>Nama Terminal:</strong> <span id="deleteNamaTerminal"></span></li>
+             <li><strong>Alamat:</strong> <span id="deleteAlamat"></span></li>
+             <li><strong>Kabupaten:</strong> <span id="deleteKabupaten"></span></li>
+             <li><strong>Provinsi:</strong> <span id="deleteProvinsi"></span></li>
+           </ul>
+         </div>
+         <div class="modal-footer">
+           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+           <button type="button" id="confirmDeleteTerminalBtn" class="btn btn-danger">Hapus</button>
+         </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Status Modal -->
+  <div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+         <div class="modal-header">
+           <h5 class="modal-title" id="statusModalLabel">Status Update</h5>
+           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+         </div>
+         <div class="modal-body">
+           <p id="statusModalMessage"></p>
+         </div>
+         <div class="modal-footer">
+           <button type="button" id="statusModalCloseBtn" class="btn btn-primary">OK</button>
          </div>
       </div>
     </div>
@@ -124,16 +216,16 @@
   
   <script>
     $(document).ready(function(){
-      // Reset the Provinsi dropdown on page load
+      // Reset the Provinsi dropdown on page load for the create form
       $('#provinsiSelect').val('');
       $('#kabupatenSelect').html('<option value="">Pilih Kabupaten</option>').prop('disabled', true);
       $('#terminalListContainer').hide();
       
-      // Initialize DataTable for the terminal list table, ordered by Provinsi (column index 2)
+      // Initialize DataTable for the terminal list table, ordered by Provinsi (column index 3)
       $('#terminalTable').DataTable({
         responsive: true,
         autoWidth: false,
-        order: [[2, 'asc']],
+        order: [[3, 'asc']],
         language: {
           search: "Cari:",
           lengthMenu: "Tampilkan _MENU_ entri",
@@ -148,16 +240,14 @@
         }
       });
       
-      // When a Provinsi is selected, enable and load the Kabupaten dropdown
+      // When a Provinsi is selected, enable and load the Kabupaten dropdown for the create form
       $('#provinsiSelect').on('change', function(){
         const provinsiId = $(this).val();
         if(provinsiId) {
           $('#kabupatenSelect').prop('disabled', false).html('<option value="">Pilih Kabupaten</option>');
-          // Fetch kabupaten based on selected provinsi
           fetch('/get-kabupaten?provinsi_id=' + provinsiId)
           .then(response => response.json())
           .then(data => {
-            // Sort alphabetically by name
             data.sort((a, b) => a.name.localeCompare(b.name));
             data.forEach(function(kab){
               $('#kabupatenSelect').append(`<option value="${kab.id}">${kab.name}</option>`);
@@ -170,7 +260,7 @@
         }
       });
       
-      // When a Kabupaten is selected, fetch and display the list of terminals in that kabupaten
+      // When a Kabupaten is selected, fetch and display the list of terminals in that kabupaten for the create form
       $('#kabupatenSelect').on('change', function(){
         const kabupatenId = $(this).val();
         const kabupatenName = $("#kabupatenSelect option:selected").text();
@@ -195,32 +285,129 @@
         }
       });
       
-      // Intercept the terminal form submission
-      $('#terminalForm').on('submit', function(e){
+      // --- Edit Terminal Modal Form Submission ---
+      $('#editTerminalForm').on('submit', function(e){
         e.preventDefault();
-        const form = this;
-        fetch(form.action, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams(new FormData(form))
+        const formData = new FormData(this);
+        // Send a POST request via fetch
+        fetch(this.action, {
+          method: 'POST',
+          body: new URLSearchParams(formData)
         })
-        .then(response => response.text())
-        .then(text => {
-          if(text.trim() === "Terminal sudah ada.") {
-            // Show warning modal
-            $('#errorModalMessage').text(text.trim());
-            var errorModal = new bootstrap.Modal(document.getElementById("errorModal"));
-            errorModal.show();
+        .then(response => response.json())
+        .then(result => {
+          // Show status modal with result message
+          if(result.success) {
+            $('#statusModalMessage').text("Data terminal berhasil diperbarui.");
           } else {
-            // On success, reload the page
-            window.location.href = "/manajemen-terminal";
+            $('#statusModalMessage').text("Error: " + result.error);
           }
+          var statusModal = new bootstrap.Modal(document.getElementById('statusModal'));
+          statusModal.show();
         })
         .catch(err => {
           console.error(err);
-          alert("Terjadi kesalahan.");
+          $('#statusModalMessage').text("Error: Terjadi kesalahan.");
+          var statusModal = new bootstrap.Modal(document.getElementById('statusModal'));
+          statusModal.show();
         });
       });
+
+      // When a Provinsi is selected (in edit modal), enable and load the Kabupaten dropdown for the create form
+      $('#editProvinsi').on('change', function(){
+        const provinsiId = $(this).val();
+        if(provinsiId) {
+          $('#editKabupaten').prop('disabled', false).html('<option value="">Pilih Kabupaten</option>');
+          fetch('/get-kabupaten?provinsi_id=' + provinsiId)
+          .then(response => response.json())
+          .then(data => {
+            data.sort((a, b) => a.name.localeCompare(b.name));
+            data.forEach(function(kab){
+              $('#editKabupaten').append(`<option value="${kab.id}">${kab.name}</option>`);
+            });
+          })
+          .catch(err => console.error('Error fetching kabupaten:', err));
+        } else {
+          $('#editKabupaten').prop('disabled', true).html('<option value="">Pilih Kabupaten</option>');
+        }
+      });
+      
+      // When the status modal is closed (by clicking OK), close the edit modal and refresh the page
+      $('#statusModalCloseBtn').on('click', function(){
+        var statusModalEl = document.getElementById('statusModal');
+        var statusModalInstance = bootstrap.Modal.getInstance(statusModalEl);
+        statusModalInstance.hide();
+        
+        // Also hide the edit modal
+        var editModalEl = document.getElementById('editTerminalModal');
+        var editModalInstance = bootstrap.Modal.getInstance(editModalEl);
+        if(editModalInstance) {
+          editModalInstance.hide();
+        }
+        
+        // Refresh the page
+        window.location.reload();
+      });
+      
+      // Handle Edit Terminal Button Click (populate modal)
+      $(document).on('click', '.edit-terminal-btn', function(){
+        var row = $(this).closest('tr');
+        var terminalId = row.data('id');
+        var namaTerminal = row.data('nama');
+        var alamat = row.data('alamat');
+        var kabupatenName = row.data('kabupaten');
+        var provinsiName = row.data('provinsi');
+        var provinsiId = row.data('provinsi-id');  // assuming these data attributes are available
+        var kabupatenId = row.data('kabupaten-id');
+        
+        // Populate the edit modal fields
+        $('#editTerminalId').val(terminalId);
+        $('#editNamaTerminal').val(namaTerminal);
+        $('#editAlamat').val(alamat);
+        $('#editProvinsi').val(provinsiId);
+        
+        var editModal = new bootstrap.Modal(document.getElementById('editTerminalModal'));
+        editModal.show();
+      });
+      
+      // Handle Delete Terminal Button Click
+      $(document).on('click', '.delete-terminal-btn', function(){
+        var row = $(this).closest('tr');
+        var terminalId = row.data('id');
+        var namaTerminal = row.data('nama');
+        var alamat = row.data('alamat');
+        var kabupatenName = row.data('kabupaten');
+        var provinsiName = row.data('provinsi');
+        
+        // Populate the delete modal with the terminal info
+        $('#deleteNamaTerminal').text(namaTerminal);
+        $('#deleteAlamat').text(alamat);
+        $('#deleteKabupaten').text(kabupatenName);
+        $('#deleteProvinsi').text(provinsiName);
+        $('#confirmDeleteTerminalBtn').data('terminal-id', terminalId);
+        
+        var deleteModal = new bootstrap.Modal(document.getElementById('deleteTerminalModal'));
+        deleteModal.show();
+      });
+      
+      // Handle deletion confirmation
+      $('#confirmDeleteTerminalBtn').on('click', function(){
+        var terminalId = $(this).data('terminal-id');
+        fetch('/manajemen-terminal/delete/' + terminalId, { method: 'DELETE' })
+          .then(response => response.json())
+          .then(result => {
+            if(result.success) {
+              window.location.reload();
+            } else {
+              alert("Error: " + result.error);
+            }
+          })
+          .catch(err => {
+            console.error(err);
+            alert("Error deleting terminal.");
+          });
+      });
+      
     });
   </script>
 </body>
