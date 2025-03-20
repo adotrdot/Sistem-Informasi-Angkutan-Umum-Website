@@ -145,6 +145,93 @@ app.post('/user-management/create-user', isAuthenticated, (req, res) => {
   );
 });
 
+// GET /manajemen-terminal (Manajemen Terminal Page)
+app.get('/manajemen-terminal', isAuthenticated, (req, res) => {
+  // Only allow admin users
+  if (req.session.user.role !== 'admin') {
+    return res.status(403).send('Forbidden');
+  }
+  
+  // Query to retrieve the list of provinsi
+  pool.query("SELECT id, name FROM provinsi ORDER BY name", (err, provinsiList) => {
+    if (err) {
+      console.error(err);
+      return res.send("Error retrieving provinsi");
+    }
+    
+    // Query to retrieve all terminals joined with their kabupaten and provinsi info
+    const terminalQuery = `
+      SELECT 
+        t.id, 
+        t.nama_terminal, 
+        t.alamat, 
+        k.name AS kabupaten_name, 
+        p.name AS provinsi_name 
+      FROM terminal t
+      LEFT JOIN kabupaten k ON t.kabupaten_id = k.id
+      LEFT JOIN provinsi p ON k.provinsi_id = p.id
+      ORDER BY t.nama_terminal ASC
+    `;
+    
+    pool.query(terminalQuery, (err, terminals) => {
+      if (err) {
+        console.error(err);
+        return res.send("Error retrieving terminals");
+      }
+      
+      // Render the Manajemen Terminal view, passing required variables
+      res.render("manajemenTerminal", { 
+        user: req.session.user, 
+        provinsiList: provinsiList, 
+        terminals: terminals 
+      });
+    });
+  });
+});
+
+// POST /manajemen-terminal/create (Create a new terminal)
+app.post('/manajemen-terminal/create', isAuthenticated, (req, res) => {
+  // Only allow admin users to create terminals
+  if (req.session.user.role !== 'admin') {
+    return res.status(403).send('Forbidden');
+  }
+  
+  // Extract form fields
+  const { provinsi, kabupaten, terminalName, alamat } = req.body;
+  if (!provinsi || !kabupaten || !terminalName || !alamat) {
+    return res.send("All fields are required.");
+  }
+  
+  // Check if a terminal with the same name already exists in the selected kabupaten
+  pool.query(
+    "SELECT * FROM terminal WHERE kabupaten_id = ? AND LOWER(nama_terminal) = ?",
+    [kabupaten, terminalName.trim().toLowerCase()],
+    (err, results) => {
+      if (err) {
+        console.error(err);
+        return res.send("Database error");
+      }
+      if (results.length > 0) {
+        // Terminal already exists
+        return res.send("Terminal sudah ada.");
+      }
+      
+      // If not, insert the new terminal record
+      pool.query(
+        "INSERT INTO terminal (nama_terminal, alamat, kabupaten_id) VALUES (?, ?, ?)",
+        [terminalName, alamat, kabupaten],
+        (err, result) => {
+          if (err) {
+            console.error(err);
+            return res.send("Error inserting terminal");
+          }
+          res.redirect('/manajemen-terminal');
+        }
+      );
+    }
+  );
+});
+
 // GET /get-kabupaten (for dependent dropdowns)
 app.get('/get-kabupaten', isAuthenticated, (req, res) => {
   const provinsiId = req.query.provinsi_id;
