@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS `terminal` (
   PRIMARY KEY (`id`),
   KEY `kabupaten_id` (`kabupaten_id`),
   CONSTRAINT `terminal_ibfk_1` FOREIGN KEY (`kabupaten_id`) REFERENCES `kabupaten` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=128 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=129 DEFAULT CHARSET=utf8mb4;
 
 -- Dumping data for table bus_terminal.terminal: ~127 rows (approximately)
 DELETE FROM `terminal`;

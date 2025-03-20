@@ -25,9 +25,9 @@ CREATE TABLE IF NOT EXISTS `bus` (
   KEY `id_PO` (`id_PO`),
   KEY `terminal_asal` (`terminal_asal`),
   KEY `terminal_tujuan` (`terminal_tujuan`),
-  CONSTRAINT `bus_ibfk_1` FOREIGN KEY (`id_PO`) REFERENCES `po` (`id`),
-  CONSTRAINT `bus_ibfk_2` FOREIGN KEY (`terminal_asal`) REFERENCES `terminal` (`id`),
-  CONSTRAINT `bus_ibfk_3` FOREIGN KEY (`terminal_tujuan`) REFERENCES `terminal` (`id`)
+  CONSTRAINT `bus_ibfk_1` FOREIGN KEY (`id_PO`) REFERENCES `po` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `bus_ibfk_2` FOREIGN KEY (`terminal_asal`) REFERENCES `terminal` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `bus_ibfk_3` FOREIGN KEY (`terminal_tujuan`) REFERENCES `terminal` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Dumping data for table bus_terminal.bus: ~1.322 rows (approximately)
@@ -50,8 +50,6 @@ INSERT INTO `bus` (`nomor_polisi`, `id_PO`, `terminal_asal`, `terminal_tujuan`, 
 	('7847', 9, 76, 76, 'AKAP'),
 	('7864', 9, 76, 76, 'ANKOT'),
 	('7928', 9, 76, 76, 'ANKOT'),
-	('A3222RM', NULL, NULL, NULL, NULL),
-	('A7556KL', 11, 76, 39, 'AKAP'),
 	('A7727KL', 11, 76, 39, 'AKAP'),
 	('A7728KL', 11, 76, 77, 'AKAP'),
 	('A7737KL', 11, 76, 40, 'AKAP'),
@@ -118,8 +116,6 @@ INSERT INTO `bus` (`nomor_polisi`, `id_PO`, `terminal_asal`, `terminal_tujuan`, 
 	('AA1690DA', 48, 76, 77, 'AKAP'),
 	('AA1692DA', 48, 76, 77, 'AKAP'),
 	('AA1735ED', 24, 76, 66, 'AKAP'),
-	('AA3222RM', NULL, NULL, NULL, 'AKAP'),
-	('AA3222RMK', NULL, NULL, NULL, NULL),
 	('AA7008OA', 18, 76, 63, 'AKAP'),
 	('AA7022OA', 48, 76, 66, 'AKAP'),
 	('AA7024OA', 48, 76, 66, 'AKAP'),

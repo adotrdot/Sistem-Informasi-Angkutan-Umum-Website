@@ -20,12 +20,11 @@ CREATE TABLE IF NOT EXISTS `po` (
   `nama_PO` varchar(255) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `nama_PO` (`nama_PO`)
-) ENGINE=InnoDB AUTO_INCREMENT=101 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=103 DEFAULT CHARSET=utf8mb4;
 
 -- Dumping data for table bus_terminal.po: ~100 rows (approximately)
 DELETE FROM `po`;
 INSERT INTO `po` (`id`, `nama_PO`) VALUES
-	(73, 'Koperasi Abadi'),
 	(68, 'Koperasi Prasojo Margo Rejeki'),
 	(97, 'Koperasi Prasojo Mugi Raharjo'),
 	(21, 'Koperasi Sapta Manunggal'),
