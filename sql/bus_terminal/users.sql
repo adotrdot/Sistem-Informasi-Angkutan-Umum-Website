@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   CONSTRAINT `users_ibfk_1` FOREIGN KEY (`terminal`) REFERENCES `terminal` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4;
 
--- Dumping data for table bus_terminal.users: ~3 rows (approximately)
+-- Dumping data for table bus_terminal.users: ~1 rows (approximately)
 DELETE FROM `users`;
 INSERT INTO `users` (`id`, `username`, `password`, `role`, `terminal`) VALUES
 	(1, 'admin', 'adminpassword', 'admin', NULL);

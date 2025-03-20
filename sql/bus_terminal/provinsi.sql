@@ -20,9 +20,9 @@ CREATE TABLE IF NOT EXISTS `provinsi` (
   `name` varchar(255) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
-) ENGINE=InnoDB AUTO_INCREMENT=26 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=34 DEFAULT CHARSET=utf8mb4;
 
--- Dumping data for table bus_terminal.provinsi: ~25 rows (approximately)
+-- Dumping data for table bus_terminal.provinsi: ~33 rows (approximately)
 DELETE FROM `provinsi`;
 INSERT INTO `provinsi` (`id`, `name`) VALUES
 	(1, 'Aceh'),
@@ -40,8 +40,16 @@ INSERT INTO `provinsi` (`id`, `name`) VALUES
 	(17, 'Kalimantan Selatan'),
 	(16, 'Kalimantan Tengah'),
 	(18, 'Kalimantan Timur'),
+	(27, 'Kalimantan Utara'),
+	(26, 'Kepulauan Riau'),
+	(28, 'Maluku'),
+	(29, 'Maluku Utara'),
 	(14, 'Nusa Tenggara Timur'),
 	(24, 'Papua'),
+	(30, 'Papua Barat'),
+	(33, 'Papua Pegunungan'),
+	(31, 'Papua Selatan'),
+	(32, 'Papua Tengah'),
 	(4, 'Riau'),
 	(19, 'Sulawesi Selatan dan Sulawesi Barat'),
 	(20, 'Sulawesi Tengah'),

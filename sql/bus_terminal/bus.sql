@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS `bus` (
   CONSTRAINT `bus_ibfk_3` FOREIGN KEY (`terminal_tujuan`) REFERENCES `terminal` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Dumping data for table bus_terminal.bus: ~1.320 rows (approximately)
+-- Dumping data for table bus_terminal.bus: ~1.322 rows (approximately)
 DELETE FROM `bus`;
 INSERT INTO `bus` (`nomor_polisi`, `id_PO`, `terminal_asal`, `terminal_tujuan`, `jenis`) VALUES
 	('', 40, 76, 78, 'AKAP'),
