@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS `arrival` (
   CONSTRAINT `arrival_ibfk_2` FOREIGN KEY (`terminal_id`) REFERENCES `terminal` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Dumping data for table bus_terminal.arrival: ~0 rows (approximately)
+-- Dumping data for table bus_terminal.arrival: ~3 rows (approximately)
 DELETE FROM `arrival`;
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;
