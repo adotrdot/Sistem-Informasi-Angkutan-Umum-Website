@@ -631,33 +631,12 @@ app.post('/user/update-terminal', isAuthenticated, (req, res) => {
 
 // GET /kedatangan (Data Kedatangan)
 app.get('/kedatangan', isAuthenticated, (req, res) => {
-  // For non-admin users without a linked terminal, redirect to /home
+  // If a non-admin user hasn't been assigned a terminal, redirect to home.
   if (req.session.user.role === 'user' && (!req.session.user.terminal || req.session.user.terminal === "")) {
     return res.redirect('/home');
   }
   
-  // Build base query without ORDER BY
-  const baseQuery = `
-    SELECT 
-      a.id AS id,
-      DATE_FORMAT(a.tanggal, '%d-%m-%Y') AS tanggal, 
-      a.jam, 
-      IFNULL(po.nama_PO, '-') AS nama_PO, 
-      a.nomor_polisi, 
-      IFNULL(b.jenis, '-') AS jenis,
-      IFNULL(ta.nama_terminal, '-') AS asal, 
-      IFNULL(tt.nama_terminal, '-') AS tujuan, 
-      a.picture_path, 
-      a.terminal_id,
-      t_main.nama_terminal AS nama_terminal
-    FROM arrival a
-    LEFT JOIN bus b ON UPPER(a.nomor_polisi) = UPPER(b.nomor_polisi)
-    LEFT JOIN PO po ON b.id_PO = po.id
-    LEFT JOIN terminal ta ON b.terminal_asal = ta.id
-    LEFT JOIN terminal tt ON b.terminal_tujuan = tt.id
-    LEFT JOIN terminal t_main ON a.terminal_id = t_main.id
-  `;
-  
+  // For an operator, we only need to retrieve the terminal name.
   if (req.session.user.role === 'user') {
     pool.query("SELECT nama_terminal FROM terminal WHERE id = ?", [req.session.user.terminal], (err, termResults) => {
       if (err) {
@@ -665,25 +644,77 @@ app.get('/kedatangan', isAuthenticated, (req, res) => {
         return res.send("Error retrieving terminal info");
       }
       const userTerminalName = (termResults.length > 0) ? termResults[0].nama_terminal : "";
-      const query = baseQuery + " WHERE a.terminal_id = ? ORDER BY a.id DESC";
-      pool.query(query, [req.session.user.terminal], (err, results) => {
-        if (err) {
-          console.error(err);
-          return res.send("Error retrieving arrival data");
-        }
-        res.render("kedatangan", { user: req.session.user, data: results, userTerminalName: userTerminalName });
-      });
+      // Render kedatangan page without preloading the arrival data.
+      res.render("kedatangan", { user: req.session.user, userTerminalName: userTerminalName });
     });
   } else {
-    const query = baseQuery + " ORDER BY a.id DESC";
-    pool.query(query, (err, results) => {
-      if (err) {
-        console.error(err);
-        return res.send("Error retrieving arrival data");
-      }
-      res.render("kedatangan", { user: req.session.user, data: results, userTerminalName: "Semua" });
-    });
+    // For admin users; optionally you can supply additional variables, but no arrival data is needed here.
+    res.render("kedatangan", { user: req.session.user, userTerminalName: "Semua" });
   }
+});
+
+// API endpoint for sending data kedatangan table
+app.get('/api/kedatangan', isAuthenticated, (req, res) => {
+  // For non-admin users, filter by the user's terminal.
+  let query;
+  let params = [];
+  if (req.session.user.role === 'user') {
+    query = `
+      SELECT 
+        a.id AS id,
+        DATE_FORMAT(a.tanggal, '%d-%m-%Y') AS tanggal, 
+        a.jam, 
+        IFNULL(po.nama_PO, '-') AS nama_PO, 
+        a.nomor_polisi, 
+        IFNULL(b.jenis, '-') AS jenis,
+        IFNULL(ta.nama_terminal, '-') AS asal, 
+        IFNULL(tt.nama_terminal, '-') AS tujuan, 
+        a.picture_path, 
+        a.terminal_id,
+        t_main.nama_terminal AS nama_terminal
+      FROM arrival a
+      LEFT JOIN bus b ON UPPER(a.nomor_polisi) = UPPER(b.nomor_polisi)
+      LEFT JOIN PO po ON b.id_PO = po.id
+      LEFT JOIN terminal ta ON b.terminal_asal = ta.id
+      LEFT JOIN terminal tt ON b.terminal_tujuan = tt.id
+      LEFT JOIN terminal t_main ON a.terminal_id = t_main.id
+      WHERE a.terminal_id = ?
+      ORDER BY a.id DESC
+    `;
+    params.push(req.session.user.terminal);
+  } else {
+    // Admin: return all data.
+    query = `
+      SELECT 
+        a.id AS id,
+        DATE_FORMAT(a.tanggal, '%d-%m-%Y') AS tanggal, 
+        a.jam, 
+        IFNULL(po.nama_PO, '-') AS nama_PO, 
+        a.nomor_polisi, 
+        IFNULL(b.jenis, '-') AS jenis,
+        IFNULL(ta.nama_terminal, '-') AS asal, 
+        IFNULL(tt.nama_terminal, '-') AS tujuan, 
+        a.picture_path, 
+        a.terminal_id,
+        t_main.nama_terminal AS nama_terminal
+      FROM arrival a
+      LEFT JOIN bus b ON UPPER(a.nomor_polisi) = UPPER(b.nomor_polisi)
+      LEFT JOIN PO po ON b.id_PO = po.id
+      LEFT JOIN terminal ta ON b.terminal_asal = ta.id
+      LEFT JOIN terminal tt ON b.terminal_tujuan = tt.id
+      LEFT JOIN terminal t_main ON a.terminal_id = t_main.id
+      ORDER BY a.id DESC
+    `;
+  }
+  
+  pool.query(query, params, (err, results) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: "Error retrieving arrival data" });
+    }
+    // Return results as JSON for DataTables to consume.
+    res.json(results);
+  });
 });
 
 // GET /edit-bus-data/:arrivalId
