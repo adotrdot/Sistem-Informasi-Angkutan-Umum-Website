@@ -1202,6 +1202,18 @@ wss.on('connection', (ws, req) => {
               console.error("Error inserting record into " + tableName + ":", err);
             } else {
               console.log("Record inserted into " + tableName + " for bus", license);
+              
+              // Broadcast to all connected WebSocket clients the update message, including terminal_id
+              wss.clients.forEach(client => {
+                if (client.readyState === client.OPEN) {
+                  const broadcastMessage = {
+                    type: 'update',
+                    message: 'New arrival record inserted',
+                    terminal_id: terminal_id
+                  };
+                  client.send(JSON.stringify(broadcastMessage));
+                }
+              });
             }
           });
         }

@@ -243,5 +243,26 @@
       window.location.href = "/edit-bus-data/" + arrivalId;
     });
   </script>
+
+  <!-- Websocket script -->
+  <script>
+    // Establish a websocket connection.
+    const wsProtocol = (location.protocol === "https:" ? "wss://" : "ws://");
+    const ws = new WebSocket(wsProtocol + location.host + "/ws");
+  
+    ws.onmessage = event => {
+      console.log("Received websocket message, reloading DataTable:", event.data);
+      // Assuming your DataTable is initialized on the element with id "datatable"
+      $('#datatable').DataTable().ajax.reload(null, false);
+    };
+  
+    ws.onerror = error => {
+      console.error("WebSocket error:", error);
+    };
+  
+    ws.onclose = () => {
+      console.log("WebSocket connection closed");
+    };
+  </script>  
 </body>
 </html>
