@@ -12,7 +12,7 @@ const ExcelJS = require('exceljs');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Create MySQL connection pool
+// Konfigurasi koneksi database MySQL dengan connection pool
 const pool = mysql.createPool({
   host: 'localhost',
   user: 'root',
@@ -20,11 +20,11 @@ const pool = mysql.createPool({
   database: 'bus_terminal'
 });
 
-// Set EJS as templating engine
+// Konfigurasi template engine EJS
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Middleware
+// Middleware untuk parsing request
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -34,23 +34,28 @@ app.use(session({
   saveUninitialized: false
 }));
 
-// Authentication middleware
+// Middleware untuk cek autentikasi user
 function isAuthenticated(req, res, next) {
   if (req.session && req.session.user) return next();
   res.redirect('/login');
 }
 
-// Root route: redirect to home
+
+// --------------------------
+// RUTE DASAR
+// --------------------------
+
+// Redirect root ke halaman home
 app.get('/', (req, res) => {
   res.redirect('/home');
 });
 
-// GET /login
+// Halaman login
 app.get('/login', (req, res) => {
   res.render('login', { error: null });
 });
 
-// POST /login
+// Proses login
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
   pool.query('SELECT * FROM users WHERE username = ? AND password = ?', [username, password], (err, results) => {
@@ -66,15 +71,20 @@ app.post('/login', (req, res) => {
   });
 });
 
-// GET /logout
+// Logout dan hancurkan sesi
 app.get('/logout', (req, res) => {
   req.session.destroy();
   res.redirect('/login');
 });
 
-// GET /home (requires login)
-// For admin users, load additional summary statistics and recent records.
+
+// --------------------------
+// RUTE HOME & DASHBOARD
+// --------------------------
+
+// Halaman home dengan data statistik
 app.get('/home', isAuthenticated, (req, res) => {
+  // Handle role admin dan operator
   if (req.session.user.role === 'admin') {
     // Query total bus arrivals
     pool.query("SELECT COUNT(*) AS total FROM arrival", (err, totalArrivalsResult) => {
@@ -182,8 +192,7 @@ app.get('/home', isAuthenticated, (req, res) => {
       });
     });
   } else {
-    // For non-admin users, you can keep your existing logic.
-    // If the user hasn't been assigned a terminal, show the forced terminal modal.
+    // Untuk operator, apabila belum memiliki terminal, munculkan modal pilih terminal.
     if (!req.session.user.terminal || req.session.user.terminal === "") {
       pool.query('SELECT * FROM provinsi ORDER BY name', (err, provinsiList) => {
         if (err) {
@@ -193,7 +202,7 @@ app.get('/home', isAuthenticated, (req, res) => {
         return res.render('homeOperator', { user: req.session.user, provinsiList: provinsiList });
       });
     } else {
-      // User has a terminal assigned.
+      // Untuk operator yang sudah memiliki terminal
       const terminalId = req.session.user.terminal;
       // Retrieve terminal info.
       pool.query("SELECT nama_terminal, alamat FROM terminal WHERE id = ?", [terminalId], (err, terminalInfoResults) => {
@@ -286,7 +295,12 @@ app.get('/home', isAuthenticated, (req, res) => {
   }
 });
 
-// GET /user-management (User Management Panel - admin only)
+
+// --------------------------
+// MANAJEMEN USER
+// --------------------------
+
+// Panel manajemen user (admin only)
 app.get('/user-management', isAuthenticated, (req, res) => {
   if (req.session.user.role !== 'admin') return res.status(403).send('Forbidden');
   
@@ -325,6 +339,7 @@ app.get('/user-management', isAuthenticated, (req, res) => {
   });
 });
 
+// Operasi CRUD untuk user
 // POST /user-management/create-user (admin only)
 app.post('/user-management/create-user', isAuthenticated, (req, res) => {
   if (req.session.user.role !== 'admin') return res.status(403).send('Forbidden');
@@ -366,6 +381,11 @@ app.delete('/user-management/delete/:id', isAuthenticated, (req, res) => {
     return res.json({ success: true });
   });
 });
+
+
+// --------------------------
+// MANAJEMEN TERMINAL & PO
+// --------------------------
 
 // GET /manajemen-terminal (Manajemen Terminal Page)
 app.get('/manajemen-terminal', isAuthenticated, (req, res) => {
@@ -629,7 +649,12 @@ app.post('/user/update-terminal', isAuthenticated, (req, res) => {
   });
 });
 
-// GET /kedatangan (Data Kedatangan)
+
+// --------------------------
+// FITUR UTAMA: KEDATANGAN BUS
+// --------------------------
+
+// Tampilkan data kedatangan
 app.get('/kedatangan', isAuthenticated, (req, res) => {
   // If a non-admin user hasn't been assigned a terminal, redirect to home.
   if (req.session.user.role === 'user' && (!req.session.user.terminal || req.session.user.terminal === "")) {
@@ -872,7 +897,10 @@ app.post('/bus/update-license', isAuthenticated, (req, res) => {
   });
 });
 
-// Generate Spreadsheet
+// --------------------------
+// LAPORAN & EXPORT EXCEL
+// --------------------------
+
 // GET /generate-spreadsheet
 app.get('/generate-spreadsheet', isAuthenticated, (req, res) => {
   if (req.session.user.role !== 'admin') {
@@ -1142,7 +1170,7 @@ app.get('/generate-spreadsheet-operator', isAuthenticated, (req, res) => {
 });
 
 // --------------------------
-// WebSocket Server Setup
+// WebSocket Server
 // --------------------------
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server, path: '/ws' });
@@ -1229,6 +1257,7 @@ wss.on('connection', (ws, req) => {
   });
 });
 
+// Jalankan server
 server.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
